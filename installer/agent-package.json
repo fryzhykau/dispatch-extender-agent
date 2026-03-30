@@ -1,0 +1,17 @@
+{
+  "name": "dispatch-agent",
+  "version": "1.0.0",
+  "description": "Dispatch Orchestrator — Worker Agent",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node worker/agent-relay.js",
+    "setup": "powershell -ExecutionPolicy Bypass -File installer/agent-setup-wizard.ps1"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

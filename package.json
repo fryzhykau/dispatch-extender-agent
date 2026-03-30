@@ -10,9 +10,14 @@
   "scripts": {
     "relay": "node relay/server.js",
     "worker": "node worker/agent-relay.js",
-    "test": "node --test test/",
+    "test": "node --test test/registry.test.js test/worker.test.js test/load-balancer.test.js test/server.test.js",
     "pii-check": "node scripts/pii-check.js",
-    "precommit": "npm run pii-check && npm test"
+    "precommit": "npm run pii-check && npm test",
+    "setup": "powershell -ExecutionPolicy Bypass -File install/setup-wizard.ps1",
+    "build:installer": "powershell -ExecutionPolicy Bypass -File installer/build.ps1",
+    "build:agent-installer": "powershell -ExecutionPolicy Bypass -File installer/build.ps1 -Target agent",
+    "build:all-installers": "powershell -ExecutionPolicy Bypass -File installer/build.ps1 -Target all",
+    "build:assets": "powershell -ExecutionPolicy Bypass -File installer/create-assets.ps1"
   },
   "dependencies": {
     "sql.js": "^1.11.0",

@@ -4,3 +4,6 @@ logs/
 *.db
 .env*
 certs/
+dist/
+installer/assets/*.bmp
+installer/assets/*.ico
