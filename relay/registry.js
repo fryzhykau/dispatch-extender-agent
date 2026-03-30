@@ -3,11 +3,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { v4 as uuidv4 } from 'uuid';
 import initSqlJs from 'sql.js';
+import { getDataDir } from '../lib/data-dir.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DB_PATH = path.resolve(__dirname, '..', 'data', 'tasks.db');
+const dataDir = getDataDir(path.resolve(__dirname, '..'));
+const DB_PATH = path.join(dataDir, 'tasks.db');
 
 const CREATE_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS tasks (
@@ -31,11 +33,7 @@ const CREATE_TABLE_SQL = `
 export async function initRegistry() {
   const SQL = await initSqlJs();
 
-  // Ensure the data directory exists
-  const dataDir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
+  // Data directory is already ensured by getDataDir()
 
   // Load existing DB file or create a fresh database
   let db;

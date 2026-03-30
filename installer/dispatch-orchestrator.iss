@@ -114,16 +114,27 @@ Name: "{group}\Start Worker"; Filename: "cmd.exe"; \
   WorkingDir: "{app}"; Comment: "Start a worker agent connected to the relay"; \
   IconFilename: "cmd.exe"
 
-; Desktop shortcut (optional — user can deselect via Tasks)
+; Desktop shortcuts (user can deselect via Tasks)
 Name: "{autodesktop}\Dispatch Dashboard"; Filename: "http://localhost:7070/dashboard"; \
   Comment: "Open the Dispatch Orchestrator dashboard"; Tasks: desktopicon
+
+Name: "{autodesktop}\Start Relay"; Filename: "cmd.exe"; \
+  Parameters: "/K node relay/server.js"; WorkingDir: "{app}"; \
+  Comment: "Start the WebSocket relay server"; Tasks: desktopicon
+
+Name: "{autodesktop}\Start Worker"; Filename: "cmd.exe"; \
+  Parameters: "/K node worker/agent-relay.js"; WorkingDir: "{app}"; \
+  Comment: "Start a worker agent"; Tasks: desktopicon
+
+Name: "{autodesktop}\Dispatch Setup"; Filename: "powershell.exe"; \
+  Parameters: "-ExecutionPolicy Bypass -File ""{app}\install\setup-wizard.ps1"""; WorkingDir: "{app}"; \
+  Comment: "Run the setup wizard"; Tasks: desktopicon
 
 ; --------------------------------------------------------------------------
 ; Optional tasks presented to the user
 ; --------------------------------------------------------------------------
 [Tasks]
-Name: "desktopicon"; Description: "Create a &desktop shortcut for the Dashboard"; GroupDescription: "Additional shortcuts:"
-
+Name: "desktopicon"; Description: "Create &desktop shortcuts (Dashboard, Start Relay, Start Worker, Setup)"; GroupDescription: "Additional shortcuts:"
 ; --------------------------------------------------------------------------
 ; Post-install actions
 ; --------------------------------------------------------------------------
@@ -133,11 +144,22 @@ Filename: "cmd.exe"; Parameters: "/C npm install --production"; \
   WorkingDir: "{app}"; StatusMsg: "Installing Node.js dependencies..."; \
   Flags: runhidden waituntilterminated; Check: NodeJsInstalled
 
+; Kill any existing relay process before launching the wizard (avoids EADDRINUSE)
+Filename: "cmd.exe"; \
+  Parameters: "/C for /f ""tokens=5"" %a in ('netstat -ano ^| findstr :7070 ^| findstr LISTENING') do taskkill /PID %a /F >nul 2>&1"; \
+  Flags: runhidden waituntilterminated
+
 ; Launch the setup wizard after installation completes
+; -WindowStyle Hidden suppresses the PowerShell console so only the WinForms GUI appears
 Filename: "powershell.exe"; \
-  Parameters: "-ExecutionPolicy Bypass -File ""{app}\install\setup-wizard.ps1"""; \
+  Parameters: "-WindowStyle Hidden -ExecutionPolicy Bypass -File ""{app}\install\setup-wizard.ps1"""; \
   WorkingDir: "{app}"; Description: "Launch the Setup Wizard now"; \
-  Flags: nowait postinstall skipifsilent shellexec; Check: NodeJsInstalled
+  Flags: postinstall skipifsilent waituntilterminated; Check: NodeJsInstalled
+
+; Open the dashboard in the default browser
+Filename: "http://localhost:7070/dashboard"; \
+  Description: "Open the Dashboard in your browser"; \
+  Flags: nowait postinstall skipifsilent shellexec unchecked
 
 ; --------------------------------------------------------------------------
 ; Uninstall actions — clean up Windows services

@@ -10,7 +10,7 @@
   "scripts": {
     "relay": "node relay/server.js",
     "worker": "node worker/agent-relay.js",
-    "test": "node --test test/registry.test.js test/worker.test.js test/load-balancer.test.js test/server.test.js",
+    "test": "node --test test/registry.test.js test/worker.test.js test/load-balancer.test.js test/config.test.js test/data-dir.test.js test/keep-awake.test.js test/audit.test.js test/queue.test.js test/discovery.test.js test/server.test.js",
     "pii-check": "node scripts/pii-check.js",
     "precommit": "npm run pii-check && npm test",
     "setup": "powershell -ExecutionPolicy Bypass -File install/setup-wizard.ps1",

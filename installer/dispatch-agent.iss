@@ -109,6 +109,20 @@ Name: "{group}\Stop Agent"; Filename: "cmd.exe"; \
   WorkingDir: "{app}"; Comment: "Stop the running worker agent or service"; \
   IconFilename: "cmd.exe"
 
+; Desktop shortcuts (user can deselect via Tasks)
+Name: "{autodesktop}\Start Agent"; Filename: "cmd.exe"; \
+  Parameters: "/K node worker/agent-relay.js"; WorkingDir: "{app}"; \
+  Comment: "Start the worker agent"; Tasks: desktopicon
+
+Name: "{autodesktop}\Agent Setup"; Filename: "powershell.exe"; \
+  Parameters: "-ExecutionPolicy Bypass -File ""{app}\installer\agent-setup-wizard.ps1"""; WorkingDir: "{app}"; \
+  Comment: "Run the agent setup wizard"; Tasks: desktopicon
+
+; --------------------------------------------------------------------------
+; Optional tasks presented to the user
+; --------------------------------------------------------------------------
+[Tasks]
+Name: "desktopicon"; Description: "Create &desktop shortcuts (Start Agent, Agent Setup)"; GroupDescription: "Additional shortcuts:"
 ; --------------------------------------------------------------------------
 ; Post-install actions
 ; --------------------------------------------------------------------------

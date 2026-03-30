@@ -63,10 +63,27 @@ Write-Host ""
 # Locate Inno Setup Compiler (ISCC.exe)
 # ---------------------------------------------------------------------------
 $IsccPaths = @(
+    "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+    "$env:USERPROFILE\AppData\Local\Programs\Inno Setup 6\ISCC.exe",
     "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
     "C:\Program Files\Inno Setup 6\ISCC.exe",
     "C:\Program Files (x86)\Inno Setup 5\ISCC.exe"
 )
+
+# Also check the registry for install location
+$regPaths = @(
+    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup*",
+    "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup*"
+)
+foreach ($regPath in $regPaths) {
+    $regEntry = Get-ItemProperty $regPath -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($regEntry -and $regEntry.InstallLocation) {
+        $regIscc = Join-Path $regEntry.InstallLocation "ISCC.exe"
+        if (Test-Path $regIscc) {
+            $IsccPaths = @($regIscc) + $IsccPaths
+        }
+    }
+}
 
 $IsccExe = $null
 
@@ -130,12 +147,12 @@ Write-Host "[OK] Inno Setup compiler: $IsccExe" -ForegroundColor Green
 # ---------------------------------------------------------------------------
 # Verify the .iss file(s) exist
 # ---------------------------------------------------------------------------
-foreach ($target in $IssTargets) {
-    if (-not (Test-Path $target.IssFile)) {
-        Write-Host "[ERROR] Inno Setup script not found: $($target.IssFile)" -ForegroundColor Red
+foreach ($issEntry in $IssTargets) {
+    if (-not (Test-Path $issEntry.IssFile)) {
+        Write-Host "[ERROR] Inno Setup script not found: $($issEntry.IssFile)" -ForegroundColor Red
         exit 1
     }
-    Write-Host "[OK] Script file: $($target.IssFile)" -ForegroundColor Green
+    Write-Host "[OK] Script file: $($issEntry.IssFile)" -ForegroundColor Green
 }
 
 # ---------------------------------------------------------------------------

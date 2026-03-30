@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getDataDir } from '../lib/data-dir.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DEFAULT_LOG_DIR = path.resolve(__dirname, '..', 'data');
+const DEFAULT_LOG_DIR = getDataDir(path.resolve(__dirname, '..'));
 const LOG_FILENAME = 'audit.log';
 
 /**

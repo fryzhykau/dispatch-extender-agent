@@ -425,6 +425,27 @@
   .toast.success { border-color: var(--green); }
   .toast.error { border-color: var(--red); }
 
+  /* Setup banner */
+  .setup-banner {
+    background: linear-gradient(135deg, #0f3460, #1a1a2e);
+    border: 2px solid #e94560;
+    border-radius: 8px;
+    padding: 24px;
+    margin: 20px 24px 0;
+    display: none;
+  }
+  .setup-banner.visible { display: block; }
+  .setup-banner h2 { color: #e94560; margin-bottom: 12px; font-size: 1.1rem; }
+  .setup-banner p { color: #e0e0e0; margin-bottom: 8px; line-height: 1.6; }
+  .setup-banner code { background: #253557; padding: 2px 8px; border-radius: 4px; font-size: 0.9rem; }
+  .setup-banner ol { color: #e0e0e0; padding-left: 24px; margin: 12px 0; }
+  .setup-banner ol li { margin-bottom: 8px; line-height: 1.5; }
+  .setup-banner .quick-setup { display: flex; gap: 12px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+  .setup-banner .quick-setup input { flex: 1; min-width: 200px; padding: 8px 12px; background: #16213e; border: 1px solid #253557; border-radius: 6px; color: #e0e0e0; font-family: monospace; font-size: 0.9rem; }
+  .setup-banner .quick-setup button { padding: 8px 20px; }
+  .setup-banner .dismiss { background: none; border: none; color: #8892a4; cursor: pointer; float: right; font-size: 1.2rem; }
+  .setup-banner .dismiss:hover { color: #e0e0e0; }
+
   /* Responsive */
   @media (max-width: 700px) {
     .task-form { grid-template-columns: 1fr; }
@@ -447,6 +468,23 @@
     <button class="gear-btn" id="settingsBtn" title="Settings">&#9881;</button>
   </div>
 </header>
+
+<!-- First-time setup banner -->
+<div class="setup-banner" id="setupBanner">
+  <button class="dismiss" id="dismissBanner" title="Dismiss">&times;</button>
+  <h2>First-Time Setup Required</h2>
+  <p>The dashboard needs your <strong>shared secret</strong> (Bearer token) to communicate with the relay API.</p>
+  <ol>
+    <li>Find your shared secret in <code>relay/config.json</code> &rarr; <code>"sharedSecret"</code> field</li>
+    <li>Paste it below and click <strong>Connect</strong></li>
+    <li>The dashboard will save it and start loading data automatically</li>
+  </ol>
+  <p style="color:#8892a4; font-size:0.85rem;">You can also change this later via the gear icon &#9881; in the top-right corner.</p>
+  <div class="quick-setup">
+    <input type="text" id="quickTokenInput" placeholder="Paste your shared secret here...">
+    <button class="btn" id="quickConnectBtn" style="background:#e94560; border-color:#e94560;">Connect</button>
+  </div>
+</div>
 
 <!-- Settings modal -->
 <div class="modal-overlay" id="settingsModal">
@@ -584,6 +622,25 @@
       sessionStorage.removeItem('dispatch_pin');
     }
   });
+  // ---- Setup banner ----
+  document.getElementById('quickConnectBtn').addEventListener('click', function() {
+    var token = document.getElementById('quickTokenInput').value.trim();
+    if (!token) { showToast('Please enter a token', 'error'); return; }
+    authToken = token;
+    localStorage.setItem('dispatch_auth_token', token);
+    tokenInput.value = token;
+    document.getElementById('setupBanner').classList.remove('visible');
+    showToast('Connected! Loading data...', 'success');
+    refreshAll();
+  });
+  document.getElementById('dismissBanner').addEventListener('click', function() {
+    document.getElementById('setupBanner').classList.remove('visible');
+  });
+  // Show banner on load if no token
+  if (!authToken) {
+    document.getElementById('setupBanner').classList.add('visible');
+  }
+
   const filterMachine = document.getElementById('filterMachine');
   const filterStatus = document.getElementById('filterStatus');
   const workDirInput = document.getElementById('workDirInput');
@@ -638,7 +695,11 @@
     }
     var resp = await fetch(url, options);
     if (resp.status === 401) {
-      showToast('Authentication required \u2014 set your token in settings', 'error');
+      if (!authToken) {
+        document.getElementById('setupBanner').classList.add('visible');
+      } else {
+        showToast('Authentication failed \u2014 check your token in settings', 'error');
+      }
     }
     return resp;
   }

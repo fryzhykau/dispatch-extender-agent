@@ -797,10 +797,10 @@ $p7.Controls.Add($script:lblCompleteTitle)
 $script:lblCompleteSummary = New-StyledLabel -Text "" -X 20 -Y 120 -Width 460 -Height 100 -Font $F_NORMAL -Color $C_TEXTDIM
 $p7.Controls.Add($script:lblCompleteSummary)
 
-$script:lblWhatsNext = New-StyledLabel -Text "" -X 20 -Y 226 -Width 460 -Height 100 -Font $F_NORMAL
+$script:lblWhatsNext = New-StyledLabel -Text "" -X 20 -Y 226 -Width 460 -Height 150 -Font $F_NORMAL
 $p7.Controls.Add($script:lblWhatsNext)
 
-$btnOpenDash = New-StyledButton -Text "Open Dashboard" -X 20 -Y 340 -Width 140 -Height 34 -BGColor $C_HIGHLIGHT
+$btnOpenDash = New-StyledButton -Text "Open Dashboard" -X 20 -Y 390 -Width 140 -Height 34 -BGColor $C_HIGHLIGHT
 $btnOpenDash.Add_Click({
     $port = if ($script:SelectedRole -eq "coordinator") { $script:txtPort.Text } else { "7070" }
     $proto = if ($script:cbEnableTLS.Checked) { "https" } else { "http" }
@@ -808,7 +808,7 @@ $btnOpenDash.Add_Click({
 })
 $p7.Controls.Add($btnOpenDash)
 
-$btnViewLogs = New-StyledButton -Text "View Logs" -X 170 -Y 340 -Width 120 -Height 34
+$btnViewLogs = New-StyledButton -Text "View Logs" -X 170 -Y 390 -Width 120 -Height 34
 $btnViewLogs.Add_Click({
     $logsDir = Join-Path $ProjectRoot "logs"
     if (Test-Path $logsDir) {
@@ -1103,9 +1103,9 @@ function Run-Installation {
     $script:progressBar.Value = 0
     $script:txtInstallLog.Text = ""
     $role = $script:SelectedRole
-    $totalSteps = 4
+    $totalSteps = 5
     if ($script:cbEnableTLS.Checked -and $script:rbSelfSigned.Checked) { $totalSteps++ }
-    if ($script:cbInstallService.Checked) { $totalSteps += 2 }
+    if ($script:cbInstallService.Checked) { $totalSteps++ }
     $stepNum = 0
 
     $advanceProgress = {
@@ -1189,6 +1189,18 @@ function Run-Installation {
         & $advanceProgress
     }
 
+    # --- Step: Kill any existing process on the relay port ---
+    $port = if ($role -eq "coordinator") { [int]$script:txtPort.Text } else { $null }
+    if ($port) {
+        $existing = netstat -ano 2>$null | Select-String ":$port\s+.*LISTENING\s+(\d+)" |
+            ForEach-Object { $_.Matches[0].Groups[1].Value } | Select-Object -Unique
+        foreach ($pid in $existing) {
+            Write-InstallLog "Stopping existing process on port $port (PID $pid)..." "INFO"
+            Stop-Process -Id ([int]$pid) -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 500
+        }
+    }
+
     # --- Step: Windows service ---
     if ($script:cbInstallService.Checked) {
         $svcName = $script:txtServiceName.Text
@@ -1256,6 +1268,67 @@ function Run-Installation {
                 Write-InstallLog "Service installation error: $_" "FAIL"
                 Write-InstallLog "You may need to run this wizard as Administrator." "INFO"
             }
+        }
+        & $advanceProgress
+    } else {
+        # --- Step: Start process directly (no service) ---
+        Write-InstallLog "Starting process directly (no Windows service)..." "INFO"
+        [System.Windows.Forms.Application]::DoEvents()
+        try {
+            $nodePath = (Get-Command node.exe).Source
+            if ($role -eq "coordinator") {
+                $entryScript = Join-Path $ProjectRoot "relay" "server.js"
+            } else {
+                $entryScript = Join-Path $ProjectRoot "worker" "agent-relay.js"
+            }
+
+            # Use AppData for logs when installed to a protected directory (Program Files)
+            $normalizedRoot = $ProjectRoot.Replace('\', '/').ToLower()
+            if ($normalizedRoot -match 'program files' -and $env:APPDATA) {
+                $logsDir = Join-Path $env:APPDATA "DispatchOrchestrator" "logs"
+            } else {
+                $logsDir = Join-Path $ProjectRoot "logs"
+            }
+            if (-not (Test-Path $logsDir)) {
+                New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
+            }
+            $processName = if ($role -eq 'coordinator') { 'relay' } else { 'worker' }
+            $logFile = Join-Path $logsDir "$processName-stdout.log"
+            $errFile = Join-Path $logsDir "$processName-stderr.log"
+
+            # Write a temp .cmd launcher to avoid nested quoting issues with cmd /C
+            $launcherFile = Join-Path $logsDir "$processName-launcher.cmd"
+            @"
+@echo off
+cd /d "$ProjectRoot"
+"$nodePath" "$entryScript" > "$logFile" 2> "$errFile"
+"@ | Set-Content -Path $launcherFile -Encoding ASCII -Force
+            Start-Process -FilePath "cmd.exe" -ArgumentList "/C `"$launcherFile`"" `
+                -WindowStyle Hidden | Out-Null
+
+            # Brief pause to check if the process crashed immediately
+            Start-Sleep -Milliseconds 2000
+            $running = Get-Process -Name "node" -ErrorAction SilentlyContinue |
+                Where-Object { $_.StartTime -gt (Get-Date).AddSeconds(-5) }
+
+            if ($running) {
+                Write-InstallLog "Started $processName process in the background." "OK"
+                Write-InstallLog "Logs: $logsDir" "INFO"
+            } else {
+                # Process may have crashed — show stderr if available
+                Write-InstallLog "Process may have failed to start." "FAIL"
+                if (Test-Path $errFile) {
+                    $errContent = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
+                    if ($errContent) {
+                        Write-InstallLog "Error output: $($errContent.Substring(0, [Math]::Min(500, $errContent.Length)))" "FAIL"
+                    }
+                }
+                Write-InstallLog "Start manually with: npm run $processName" "INFO"
+            }
+            Write-InstallLog "NOTE: This process will stop when you log out. Use the Windows Service option for persistent operation." "INFO"
+        } catch {
+            Write-InstallLog "Failed to start process: $_" "FAIL"
+            Write-InstallLog "Start manually with: npm run $(if ($role -eq 'coordinator') { 'relay' } else { 'worker' })" "INFO"
         }
         & $advanceProgress
     }
@@ -1373,19 +1446,55 @@ $btnNext.Add_Click({
             if ($role -eq "coordinator") {
                 $port = $script:txtPort.Text
                 $proto = if ($script:cbEnableTLS.Checked) { "https" } else { "http" }
+                $secret = $script:txtSecretCoord.Text
+                $secretHint = $secret.Substring(0, [Math]::Min(4, $secret.Length)) + "...." + $secret.Substring([Math]::Max(0, $secret.Length - 4))
+                $svcInstalled = $script:cbInstallService.Checked
                 $script:lblCompleteSummary.Text = "Your machine has been configured as a Coordinator.`nThe relay server is configured on port $port.`nShared secret has been set in relay/config.json."
-                $script:lblWhatsNext.Text = "What's next:`n`n" +
-                    "  - Open the dashboard at $proto`://localhost:$port/dashboard`n" +
-                    "  - Run workers on other machines and point them to this coordinator`n" +
-                    "  - Start manually with: npm run relay"
+                if ($svcInstalled) {
+                    $script:lblWhatsNext.Text = "What's next:`n`n" +
+                        "  - The relay is running as a Windows service (starts on boot)`n" +
+                        "  - Open the dashboard at $proto`://localhost:$port/dashboard`n" +
+                        "  - Run workers on other machines and point them to this coordinator`n`n" +
+                        "DASHBOARD SETUP:`n" +
+                        "  When prompted, enter your shared secret as the Bearer token.`n" +
+                        "  Your shared secret is: $secretHint"
+                } else {
+                    $script:lblWhatsNext.Text = "What's next:`n`n" +
+                        "  - The relay has been started in the background`n" +
+                        "  - Open the dashboard at $proto`://localhost:$port/dashboard`n" +
+                        "  - Run workers on other machines and point them to this coordinator`n" +
+                        "  - To restart later: npm run relay`n`n" +
+                        "DASHBOARD SETUP:`n" +
+                        "  When prompted, enter your shared secret as the Bearer token.`n" +
+                        "  Your shared secret is: $secretHint"
+                }
             } else {
                 $agentName = $script:txtAgentName.Text
                 $coordHost = $script:txtCoordHost.Text
+                $secret = $script:txtSecretWorker.Text
+                $secretHint = $secret.Substring(0, [Math]::Min(4, $secret.Length)) + "...." + $secret.Substring([Math]::Max(0, $secret.Length - 4))
+                $svcInstalled = $script:cbInstallService.Checked
                 $script:lblCompleteSummary.Text = "Your machine has been configured as Worker '$agentName'.`nCoordinator: $coordHost`nConfiguration saved to worker/worker-config.json."
-                $script:lblWhatsNext.Text = "What's next:`n`n" +
-                    "  - Ensure the coordinator is running`n" +
-                    "  - Your agent '$agentName' will connect automatically`n" +
-                    "  - Start manually with: npm run worker"
+                if ($svcInstalled) {
+                    $script:lblWhatsNext.Text = "What's next:`n`n" +
+                        "  - The worker is running as a Windows service (starts on boot)`n" +
+                        "  - Ensure the coordinator is running`n" +
+                        "  - Your agent '$agentName' will connect automatically`n`n" +
+                        "DASHBOARD SETUP:`n" +
+                        "  Open the coordinator's dashboard`n" +
+                        "  When prompted, enter your shared secret as the Bearer token.`n" +
+                        "  Your shared secret is: $secretHint"
+                } else {
+                    $script:lblWhatsNext.Text = "What's next:`n`n" +
+                        "  - The worker has been started in the background`n" +
+                        "  - Ensure the coordinator is running`n" +
+                        "  - Your agent '$agentName' will connect automatically`n" +
+                        "  - To restart later: npm run worker`n`n" +
+                        "DASHBOARD SETUP:`n" +
+                        "  Open the coordinator's dashboard`n" +
+                        "  When prompted, enter your shared secret as the Bearer token.`n" +
+                        "  Your shared secret is: $secretHint"
+                }
             }
 
             Show-Step 7
@@ -1432,6 +1541,16 @@ $btnCancel.Add_Click({
 # SHOW FIRST STEP AND RUN
 # ===================================================================
 Show-Step 0
+
+# When launched with -WindowStyle Hidden (from installer), the console is hidden
+# but the WinForms form still needs to be brought to front.
+$form.Add_Shown({
+    $form.TopMost = $true
+    $form.Activate()
+    $form.BringToFront()
+    $form.TopMost = $false
+})
+
 [void]$form.ShowDialog()
 
 # Cleanup

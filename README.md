@@ -54,10 +54,13 @@ See which agents are connected, what they're working on, task history, queue dep
 
 ## Prerequisites
 
-- **Node.js 18+** on all machines
-- **Claude Code CLI** installed on all worker machines
-- **NSSM** (optional) for running as Windows services
-- **OpenSSL** (optional, ships with Git for Windows) for TLS certificate generation
+| Dependency | Required | How to install |
+|-----------|----------|----------------|
+| **Node.js 18+** | Yes (all machines) | `winget install OpenJS.NodeJS.LTS` or [nodejs.org](https://nodejs.org/) |
+| **Claude Code CLI** | Yes (worker machines) | `npm install -g @anthropic-ai/claude-code` |
+| **Inno Setup 6** | For building .exe installers | `winget install JRSoftware.InnoSetup` or [jrsoftware.org](https://jrsoftware.org/isdl.php) |
+| **NSSM** | For running as Windows services | `winget install NSSM.NSSM` or [nssm.cc](https://nssm.cc/) |
+| **OpenSSL** | For TLS certificates | Ships with [Git for Windows](https://gitforwindows.org/) |
 
 ## Quick Start
 
@@ -270,6 +273,65 @@ Enable encrypted WebSocket (WSS) and HTTPS:
 # Change coordinatorHost from ws:// to wss://
 ```
 
+## Networking & Connectivity
+
+Workers need to know where the relay is. There are two ways to connect, depending on your network topology.
+
+### Local Network (LAN)
+
+On the same subnet, workers can **auto-discover** the relay with zero configuration:
+
+1. The relay broadcasts a UDP packet to `255.255.255.255:7071` every 5 seconds, announcing its IP and port
+2. Workers with `coordinatorHost` set to `"auto"` listen for these broadcasts and connect automatically
+
+```json
+// worker/worker-config.json
+{
+  "coordinatorHost": "auto",
+  "discovery": { "enabled": true, "broadcastPort": 7071 }
+}
+```
+
+UDP broadcast does **not** cross routers or subnets. All machines must be on the same local network segment for discovery to work.
+
+Alternatively, you can skip discovery and point workers directly at the relay's LAN IP:
+
+```json
+"coordinatorHost": "ws://192.168.1.100:7070"
+```
+
+### Public Internet / Cross-Subnet
+
+For machines on different networks (remote offices, cloud VMs, etc.), auto-discovery won't work. Instead:
+
+1. **Set `coordinatorHost`** to the relay's public address or hostname:
+   ```json
+   "coordinatorHost": "wss://relay.example.com:7070"
+   ```
+
+2. **Enable TLS** — strongly recommended for any non-local traffic. Enable in both `relay/config.json` and `worker/worker-config.json`:
+   ```json
+   "tls": { "enabled": true, "certFile": "...", "keyFile": "...", "caFile": "..." }
+   ```
+   Generate certificates with `.\install\generate-certs.ps1`. The relay uses mutual TLS (mTLS) — both sides verify each other's certificates.
+
+3. **Open the relay port** (default 7070) on the coordinator's firewall/router. The relay binds to `0.0.0.0`, so it accepts connections from any interface.
+
+4. **Authentication is always enforced** regardless of network type — workers must present the `sharedSecret` token on registration, and all HTTP API calls require a Bearer token.
+
+### Connection Resilience
+
+Workers automatically reconnect if the relay goes down or the network drops. Reconnection uses exponential backoff starting at 1 second, capped at 30 seconds. Once the relay is reachable again, the worker re-registers and is immediately available for tasks.
+
+### Summary
+
+| Scenario | Discovery | `coordinatorHost` | TLS |
+|----------|-----------|-------------------|-----|
+| Same machine (dev/testing) | Optional | `ws://localhost:7070` | Not needed |
+| Same LAN subnet | Auto | `"auto"` | Optional |
+| Cross-subnet / VPN | No | `ws://<relay-ip>:7070` | Recommended |
+| Public internet | No | `wss://<relay-host>:7070` | **Required** |
+
 ## Features
 
 ### Task Queue
@@ -291,7 +353,7 @@ Set in `relay/config.json` under `loadBalancing.strategy`.
 
 ### Auto-Discovery
 
-Workers can find the relay automatically without hardcoding the address. The relay broadcasts UDP announcements on port 7071. Set `coordinatorHost` to `"auto"` in worker config to use discovery.
+Workers can find the relay automatically on the local network via UDP broadcast. Set `coordinatorHost` to `"auto"` in worker config. See [Networking & Connectivity](#networking--connectivity) for details on LAN vs public internet setups.
 
 ### Heartbeat Monitoring
 
@@ -310,6 +372,57 @@ A real-time web dashboard at `http://localhost:7070/dashboard` showing:
 - Queue status indicator
 - Auto-refresh (5 second interval, toggleable)
 
+## Building Installers
+
+Standalone `.exe` installers for distributing to machines. Requires **Inno Setup 6**.
+
+### Install Inno Setup (one-time)
+
+```powershell
+winget install JRSoftware.InnoSetup
+```
+
+Or download manually from [jrsoftware.org/isdl.php](https://jrsoftware.org/isdl.php). After installing, **restart your terminal** so `ISCC.exe` is on PATH.
+
+### Build the installers
+
+```bash
+# Step 1: Generate banner images and icon for the installer UI
+npm run build:assets
+
+# Step 2: Build both installers
+npm run build:all-installers
+```
+
+Or build individually:
+
+```bash
+npm run build:installer          # Coordinator-only: dist/DispatchOrchestratorSetup.exe
+npm run build:agent-installer    # Agent-only:       dist/DispatchAgentSetup.exe
+```
+
+Output goes to `dist/` with SHA256 checksums.
+
+| Installer | Target Machine | What's included |
+|-----------|---------------|-----------------|
+| `DispatchOrchestratorSetup.exe` | Coordinator (Machine 1) | Relay, dashboard, coordinator, worker, full setup wizard |
+| `DispatchAgentSetup.exe` | Workers (Machine 2+) | Agent relay, discovery, keep-awake, agent setup wizard |
+
+Both installers:
+- Check for Node.js and Claude Code CLI prerequisites
+- Run `npm install` automatically
+- Launch the setup wizard after installation
+- Create Start Menu shortcuts
+- Include an uninstaller that cleans up services
+
+### Setup Wizard (without building an installer)
+
+If you cloned the repo directly instead of using an installer, you can run the setup wizard from source:
+
+```bash
+npm run setup                    # Full orchestrator wizard (coordinator or worker)
+```
+
 ## Windows Service Installation
 
 Run as persistent background services that survive reboots:
@@ -323,6 +436,64 @@ Run as persistent background services that survive reboots:
 ```
 
 Requires [NSSM](https://nssm.cc/) on PATH. Logs are written to the `logs/` directory.
+
+## Starting After Reboot / Shutdown
+
+There are three ways to run the orchestrator, depending on your setup:
+
+### Option A: Windows Services (recommended for always-on machines)
+
+If you installed as a Windows service during setup, everything starts automatically on boot — no action needed. To verify:
+
+```powershell
+# Check service status
+sc query DispatchRelay     # On the coordinator
+sc query DispatchWorker    # On worker machines
+
+# Manually start/stop if needed
+sc start DispatchRelay
+sc stop DispatchRelay
+```
+
+### Option B: Desktop Shortcuts (recommended for on-demand use)
+
+After installing, use the desktop shortcuts:
+1. **Start Relay** — double-click to start the coordinator relay server
+2. **Start Worker** / **Start Agent** — double-click to start the worker agent
+3. **Dispatch Dashboard** — opens the monitoring dashboard in your browser
+
+Start the relay first, then the workers. Each opens in its own console window — close the window to stop it.
+
+### Option C: Command Line
+
+```bash
+# On the coordinator machine
+cd "C:\Program Files\DispatchOrchestrator"   # or your install directory
+npm run relay
+
+# On each worker machine (separate terminal)
+cd "C:\Program Files\DispatchAgent"          # or your install directory
+npm run worker
+```
+
+### Startup Order
+
+Always start in this order:
+1. **Relay server first** (coordinator machine)
+2. **Workers second** (they connect to the relay; will auto-reconnect if started before the relay)
+3. **Open dashboard** to verify everything is connected: http://localhost:7070/dashboard
+
+## Uninstalling
+
+**Windows Settings (recommended):** Settings > Apps > Installed apps > search "Dispatch Orchestrator" (or "Dispatch Agent") > Uninstall
+
+**Start Menu:** Open the Dispatch Orchestrator folder > click "Uninstall Dispatch Orchestrator"
+
+**Direct:** Run `"C:\Program Files\DispatchOrchestrator\unins000.exe"`
+
+The uninstaller automatically stops and removes Windows services, deletes `node_modules`, `data`, `logs`, and `certs`, removes all shortcuts, and cleans up registry entries. Your config files (`relay/config.json`, `worker/worker-config.json`) are removed with the app directory.
+
+> **Note:** If you used `%APPDATA%\DispatchOrchestrator` for data (happens when installed to Program Files), that directory is not removed by the uninstaller. Delete it manually if needed: `rmdir /s "%APPDATA%\DispatchOrchestrator"`
 
 ## Configuration Reference
 
