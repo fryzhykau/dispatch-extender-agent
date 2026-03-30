@@ -1,0 +1,52 @@
+{
+  "port": 7070,
+  "sharedSecret": "CHANGE-ME-generate-a-real-secret",
+  "machines": [
+    {
+      "machineId": "machine-2",
+      "description": "Worker machine 2",
+      "defaultWorkingDir": "C:/workspace"
+    }
+  ],
+  "tls": {
+    "enabled": false,
+    "certFile": "../certs/server.crt",
+    "keyFile": "../certs/server.key",
+    "caFile": "../certs/ca.crt"
+  },
+  "discovery": {
+    "enabled": true,
+    "broadcastPort": 7071,
+    "intervalMs": 5000
+  },
+  "heartbeat": {
+    "intervalMs": 30000,
+    "timeoutMs": 10000
+  },
+  "loadBalancing": {
+    "strategy": "least-busy"
+  },
+  "rateLimiting": {
+    "enabled": true,
+    "maxTasksPerMinute": 10,
+    "maxTasksPerHour": 100
+  },
+  "limits": {
+    "maxPromptLength": 50000,
+    "maxOutputLength": 1000000,
+    "maxRequestBodyBytes": 102400
+  },
+  "keepAwake": {
+    "enabled": true
+  },
+  "queue": {
+    "enabled": true,
+    "maxQueueSize": 100
+  },
+  "pin": {
+    "enabled": true,
+    "code": "1234",
+    "maxAttempts": 5,
+    "lockoutMinutes": 15
+  }
+}

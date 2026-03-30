@@ -1,0 +1,33 @@
+{
+  "machineId": "machine-2",
+  "agentName": "CodeBot",
+  "agentDescription": "Handles coding tasks, refactoring, and code review",
+  "agentCapabilities": ["code", "refactor", "review", "debug"],
+  "coordinatorHost": "ws://localhost:7070",
+  "sharedSecret": "CHANGE-ME-generate-a-real-secret",
+  "defaultWorkingDir": "C:/workspace",
+  "allowedDirs": [
+    "C:/workspace"
+  ],
+  "denyDirs": [
+    "C:/Windows",
+    "C:/Program Files",
+    "C:/Program Files (x86)",
+    "C:/Users/*/AppData"
+  ],
+  "tls": {
+    "enabled": false,
+    "certFile": "../certs/client.crt",
+    "keyFile": "../certs/client.key",
+    "caFile": "../certs/ca.crt"
+  },
+  "discovery": {
+    "enabled": true,
+    "broadcastPort": 7071,
+    "timeoutMs": 15000
+  },
+  "maxOutputLength": 1000000,
+  "keepAwake": {
+    "enabled": true
+  }
+}

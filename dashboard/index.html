@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dispatch Orchestrator</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #1a1a2e;
+    --card: #16213e;
+    --accent: #0f3460;
+    --highlight: #e94560;
+    --text: #e0e0e0;
+    --text-dim: #8892a4;
+    --green: #2ecc71;
+    --red: #e74c3c;
+    --yellow: #f1c40f;
+    --orange: #e67e22;
+    --blue: #3498db;
+    --border: #253557;
+    --radius: 8px;
+  }
+
+  body {
+    font-family: 'Segoe UI', Consolas, 'Courier New', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* Header */
+  header {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  header .left { display: flex; align-items: center; gap: 12px; }
+
+  header h1 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  .status-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--red);
+    display: inline-block;
+    transition: background 0.3s;
+  }
+  .status-dot.online { background: var(--green); }
+
+  header .right { display: flex; align-items: center; gap: 12px; }
+
+  .btn {
+    background: var(--accent);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 6px 14px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.2s;
+  }
+  .btn:hover { background: var(--highlight); }
+  .btn.active { background: var(--highlight); }
+
+  .gear-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 4px;
+    transition: color 0.2s;
+  }
+  .gear-btn:hover { color: var(--text); }
+
+  /* Settings modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    width: 380px;
+    max-width: 90vw;
+  }
+  .modal h2 { margin-bottom: 16px; font-size: 1.1rem; }
+  .modal label { display: block; margin-bottom: 4px; font-size: 0.85rem; color: var(--text-dim); }
+  .modal input[type="text"] {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+  }
+  .modal .actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* Main layout */
+  main {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px;
+    display: grid;
+    gap: 24px;
+  }
+
+  /* Panels */
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .panel h2 {
+    font-size: 1rem;
+    margin-bottom: 16px;
+    color: var(--highlight);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  /* Submit task form */
+  .task-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .task-form .full-width { grid-column: 1 / -1; }
+
+  .task-form select,
+  .task-form input,
+  .task-form textarea {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.9rem;
+    resize: vertical;
+  }
+  .task-form textarea { min-height: 70px; }
+
+  .task-form label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+
+  .task-form input[type="password"] {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.9rem;
+  }
+  .pin-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .pin-row label.remember-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 0;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .pin-row label.remember-label input[type="checkbox"] {
+    width: auto;
+    cursor: pointer;
+  }
+
+  .task-form .submit-btn {
+    background: var(--highlight);
+    color: #fff;
+    border: none;
+    padding: 10px 24px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: opacity 0.2s;
+    justify-self: start;
+  }
+  .task-form .submit-btn:hover { opacity: 0.85; }
+  .task-form .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Machine cards grid */
+  .machine-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+  }
+
+  .machine-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+  }
+  .machine-card .machine-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .machine-card .agent-name {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--highlight);
+  }
+  .machine-card .machine-id {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  .machine-card .machine-id-sub {
+    font-weight: 400;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+  .machine-card .agent-desc {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    font-style: italic;
+  }
+  .capability-tag {
+    display: inline-block;
+    background: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1px 8px;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    margin: 1px 2px;
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .status-badge.idle { background: var(--green); color: #000; }
+  .status-badge.busy { background: var(--orange); color: #000; }
+  .status-badge.done { background: var(--green); color: #000; }
+  .status-badge.error { background: var(--red); color: #fff; }
+  .status-badge.pending { background: var(--yellow); color: #000; }
+  .status-badge.timeout { background: var(--orange); color: #000; }
+  .status-badge.running { background: var(--blue); color: #fff; }
+  .status-badge.queued { background: var(--yellow); color: #000; }
+
+  .queue-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: var(--accent);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    transition: background 0.3s, color 0.3s;
+  }
+  .queue-badge.has-items {
+    background: var(--orange);
+    color: #000;
+    border-color: var(--orange);
+  }
+
+  .machine-card .detail {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+
+  .no-data {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 24px;
+  }
+
+  /* Task table */
+  .task-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  .task-table th {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 2px solid var(--border);
+    color: var(--text-dim);
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+  .task-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .task-table tr.task-row { cursor: pointer; transition: background 0.15s; }
+  .task-table tr.task-row:hover { background: rgba(233,69,96,0.08); }
+
+  .task-table .prompt-cell {
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .task-output-row td {
+    padding: 0;
+  }
+  .task-output-wrap {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin: 4px 10px 10px;
+    padding: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 0.82rem;
+    max-height: 400px;
+    overflow-y: auto;
+    color: var(--text-dim);
+  }
+
+  /* Pagination */
+  .pagination {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    justify-content: center;
+  }
+  .pagination .btn { font-size: 0.8rem; padding: 4px 12px; }
+  .pagination span { font-size: 0.85rem; color: var(--text-dim); }
+
+  /* Filter bar */
+  .filter-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  .filter-bar label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    display: block;
+    margin-bottom: 3px;
+  }
+  .filter-bar select {
+    padding: 6px 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 0.85rem;
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 20px;
+    font-size: 0.9rem;
+    z-index: 300;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  .toast.success { border-color: var(--green); }
+  .toast.error { border-color: var(--red); }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    .task-form { grid-template-columns: 1fr; }
+    header { flex-direction: column; gap: 8px; }
+    .filter-bar { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="left">
+    <span class="status-dot" id="relayDot" title="Relay connection status"></span>
+    <h1>Dispatch Orchestrator</h1>
+  </div>
+  <div class="right">
+    <span class="queue-badge" id="queueBadge" title="Queued tasks">Queue: 0</span>
+    <button class="btn active" id="autoRefreshBtn" title="Toggle auto-refresh">Auto-Refresh: ON</button>
+    <button class="gear-btn" id="settingsBtn" title="Settings">&#9881;</button>
+  </div>
+</header>
+
+<!-- Settings modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h2>Settings</h2>
+    <label for="relayUrlInput">Relay URL</label>
+    <input type="text" id="relayUrlInput" value="http://localhost:7070">
+    <label for="tokenInput">Bearer Token</label>
+    <input type="text" id="tokenInput" placeholder="Shared secret for API auth">
+    <div class="actions">
+      <button class="btn" id="settingsCancelBtn">Cancel</button>
+      <button class="btn" id="settingsSaveBtn" style="background:var(--highlight)">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<main>
+
+  <!-- Submit Task -->
+  <div class="panel">
+    <h2>Submit Task</h2>
+    <div class="task-form" id="taskForm">
+      <div>
+        <label for="machineSelect">Machine</label>
+        <select id="machineSelect"><option value="">Loading...</option></select>
+      </div>
+      <div>
+        <label for="workDirInput">Working Directory (optional)</label>
+        <input type="text" id="workDirInput" placeholder="e.g. C:/workspace">
+      </div>
+      <div class="full-width">
+        <label for="promptInput">Prompt</label>
+        <textarea id="promptInput" placeholder="Enter task prompt..."></textarea>
+      </div>
+      <div>
+        <label for="pinInput">PIN</label>
+        <input type="password" id="pinInput" placeholder="Enter PIN" maxlength="6" pattern="[0-9]*" inputmode="numeric">
+      </div>
+      <div style="display:flex;align-items:end;">
+        <label class="remember-label"><input type="checkbox" id="rememberPin"> Remember PIN for this session</label>
+      </div>
+      <div class="full-width">
+        <button class="submit-btn" id="submitTaskBtn">Submit Task</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Machine Status -->
+  <div class="panel">
+    <h2>Machine Status</h2>
+    <div class="machine-grid" id="machineGrid">
+      <div class="no-data">No machines connected</div>
+    </div>
+  </div>
+
+  <!-- Task History -->
+  <div class="panel">
+    <h2>Task History</h2>
+    <div class="filter-bar">
+      <div>
+        <label for="filterStatus">Status</label>
+        <select id="filterStatus">
+          <option value="">All</option>
+          <option value="pending">Pending</option>
+          <option value="queued">Queued</option>
+          <option value="running">Running</option>
+          <option value="done">Done</option>
+          <option value="error">Error</option>
+          <option value="timeout">Timeout</option>
+        </select>
+      </div>
+      <div>
+        <label for="filterMachine">Machine</label>
+        <select id="filterMachine"><option value="">All</option></select>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="task-table">
+        <thead>
+          <tr>
+            <th>Task ID</th>
+            <th>Machine</th>
+            <th>Status</th>
+            <th>Prompt</th>
+            <th>Duration</th>
+            <th>Created At</th>
+          </tr>
+        </thead>
+        <tbody id="taskTableBody">
+          <tr><td colspan="6" class="no-data">No tasks yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+</main>
+
+<script>
+(function() {
+  // ---- State ----
+  let relayUrl = localStorage.getItem('dispatch_relay_url') || 'http://localhost:7070';
+  let authToken = localStorage.getItem('dispatch_auth_token') || '';
+  let autoRefresh = true;
+  let refreshTimer = null;
+  let currentPage = 0;
+  const PAGE_SIZE = 50;
+  let expandedTaskId = null;
+
+  // ---- DOM refs ----
+  const relayDot = document.getElementById('relayDot');
+  const autoRefreshBtn = document.getElementById('autoRefreshBtn');
+  const settingsBtn = document.getElementById('settingsBtn');
+  const settingsModal = document.getElementById('settingsModal');
+  const settingsCancelBtn = document.getElementById('settingsCancelBtn');
+  const settingsSaveBtn = document.getElementById('settingsSaveBtn');
+  const relayUrlInput = document.getElementById('relayUrlInput');
+  const tokenInput = document.getElementById('tokenInput');
+  const machineGrid = document.getElementById('machineGrid');
+  const machineSelect = document.getElementById('machineSelect');
+  const pinInput = document.getElementById('pinInput');
+  const rememberPin = document.getElementById('rememberPin');
+
+  // Restore PIN from sessionStorage if remembered
+  var savedPin = sessionStorage.getItem('dispatch_pin');
+  if (savedPin) {
+    pinInput.value = savedPin;
+    rememberPin.checked = true;
+  }
+  rememberPin.addEventListener('change', function() {
+    if (!rememberPin.checked) {
+      sessionStorage.removeItem('dispatch_pin');
+    }
+  });
+  const filterMachine = document.getElementById('filterMachine');
+  const filterStatus = document.getElementById('filterStatus');
+  const workDirInput = document.getElementById('workDirInput');
+  const promptInput = document.getElementById('promptInput');
+  const submitTaskBtn = document.getElementById('submitTaskBtn');
+  const taskTableBody = document.getElementById('taskTableBody');
+  const paginationDiv = document.getElementById('pagination');
+  const toast = document.getElementById('toast');
+  const queueBadge = document.getElementById('queueBadge');
+
+  relayUrlInput.value = relayUrl;
+  tokenInput.value = authToken;
+
+  // ---- Helpers ----
+  function showToast(msg, type) {
+    toast.textContent = msg;
+    toast.className = 'toast show ' + (type || '');
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(function() { toast.className = 'toast'; }, 3000);
+  }
+
+  function truncate(str, len) {
+    if (!str) return '';
+    return str.length > len ? str.substring(0, len) + '...' : str;
+  }
+
+  function formatDuration(ms) {
+    if (ms == null) return '-';
+    if (ms < 1000) return ms + 'ms';
+    return (ms / 1000).toFixed(1) + 's';
+  }
+
+  function formatDate(ts) {
+    if (!ts) return '-';
+    var d = new Date(ts);
+    return d.toLocaleString();
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+  }
+
+  async function apiFetch(endpoint, options) {
+    var url = relayUrl.replace(/\/+$/, '') + endpoint;
+    options = options || {};
+    options.headers = options.headers || {};
+    if (authToken) {
+      options.headers['Authorization'] = 'Bearer ' + authToken;
+    }
+    var resp = await fetch(url, options);
+    if (resp.status === 401) {
+      showToast('Authentication required \u2014 set your token in settings', 'error');
+    }
+    return resp;
+  }
+
+  // ---- Relay health check ----
+  async function checkRelay() {
+    try {
+      var resp = await apiFetch('/status');
+      if (resp.ok) {
+        relayDot.classList.add('online');
+      } else {
+        relayDot.classList.remove('online');
+      }
+    } catch(e) {
+      relayDot.classList.remove('online');
+    }
+  }
+
+  // ---- Load machines ----
+  async function loadMachines() {
+    try {
+      var resp = await apiFetch('/status');
+      if (!resp.ok) return;
+      var machines = await resp.json();
+
+      // Update machine grid
+      if (machines.length === 0) {
+        machineGrid.innerHTML = '<div class="no-data">No machines connected</div>';
+      } else {
+        machineGrid.innerHTML = machines.map(function(m) {
+          var nameHtml = m.agentName
+            ? '<span class="agent-name">' + escapeHtml(m.agentName) + '</span>'
+            : '<span class="machine-id">' + escapeHtml(m.machineId) + '</span>';
+          var subIdHtml = m.agentName
+            ? '<div class="machine-id-sub">' + escapeHtml(m.machineId) + '</div>'
+            : '';
+          var descHtml = m.agentDescription
+            ? '<div class="agent-desc">' + escapeHtml(m.agentDescription) + '</div>'
+            : '';
+          var capsHtml = '';
+          if (m.agentCapabilities && m.agentCapabilities.length > 0) {
+            capsHtml = '<div style="margin-top:4px">' + m.agentCapabilities.map(function(c) {
+              return '<span class="capability-tag">' + escapeHtml(c) + '</span>';
+            }).join('') + '</div>';
+          }
+          return '<div class="machine-card">' +
+            '<div class="machine-header">' +
+              nameHtml +
+              '<span class="status-badge ' + m.status + '">' + m.status + '</span>' +
+            '</div>' +
+            subIdHtml +
+            descHtml +
+            '<div class="detail">Connected: ' + formatDate(m.connectedAt) + '</div>' +
+            '<div class="detail">Dir: ' + escapeHtml(m.workingDir || 'N/A') + '</div>' +
+            capsHtml +
+          '</div>';
+        }).join('');
+      }
+
+      // Update machine select dropdown
+      var currentVal = machineSelect.value;
+      machineSelect.innerHTML = '<option value="">-- select agent --</option>' +
+        '<option value="any"' + (currentVal === 'any' ? ' selected' : '') + '>Any (auto-select)</option>' +
+        machines.map(function(m) {
+          var label = m.agentName
+            ? escapeHtml(m.agentName) + ' (' + escapeHtml(m.machineId) + ')'
+            : escapeHtml(m.machineId);
+          return '<option value="' + escapeHtml(m.machineId) + '"' +
+            (m.machineId === currentVal ? ' selected' : '') + '>' +
+            label + ' - ' + m.status + '</option>';
+        }).join('');
+
+      // Update filter machine dropdown
+      var currentFilter = filterMachine.value;
+      filterMachine.innerHTML = '<option value="">All</option>' +
+        machines.map(function(m) {
+          return '<option value="' + escapeHtml(m.machineId) + '"' +
+            (m.machineId === currentFilter ? ' selected' : '') + '>' +
+            escapeHtml(m.machineId) + '</option>';
+        }).join('');
+
+    } catch(e) {
+      // silently fail
+    }
+  }
+
+  // ---- Load tasks ----
+  async function loadTasks() {
+    try {
+      var params = '?limit=' + PAGE_SIZE + '&offset=' + (currentPage * PAGE_SIZE);
+      var statusFilter = filterStatus.value;
+      var machineFilter = filterMachine.value;
+      if (statusFilter) params += '&status=' + encodeURIComponent(statusFilter);
+      if (machineFilter) params += '&machineId=' + encodeURIComponent(machineFilter);
+
+      var resp = await apiFetch('/tasks' + params);
+      if (!resp.ok) return;
+      var data = await resp.json();
+      var tasks = data.tasks || [];
+      var total = data.total || 0;
+
+      if (tasks.length === 0) {
+        taskTableBody.innerHTML = '<tr><td colspan="6" class="no-data">No tasks found</td></tr>';
+        paginationDiv.innerHTML = '';
+        return;
+      }
+
+      var html = '';
+      tasks.forEach(function(t) {
+        var isExpanded = expandedTaskId === t.id;
+        html += '<tr class="task-row" data-id="' + t.id + '">' +
+          '<td title="' + escapeHtml(t.id) + '">' + truncate(t.id, 8) + '</td>' +
+          '<td>' + escapeHtml(t.machineId) + '</td>' +
+          '<td><span class="status-badge ' + t.status + '">' + t.status + '</span></td>' +
+          '<td class="prompt-cell" title="' + escapeHtml(t.prompt) + '">' + escapeHtml(truncate(t.prompt, 60)) + '</td>' +
+          '<td>' + formatDuration(t.durationMs) + '</td>' +
+          '<td>' + formatDate(t.createdAt) + '</td>' +
+        '</tr>';
+        if (isExpanded) {
+          html += '<tr class="task-output-row"><td colspan="6">' +
+            '<div class="task-output-wrap">' +
+              (t.output ? escapeHtml(t.output) : '(no output)') +
+            '</div>' +
+          '</td></tr>';
+        }
+      });
+      taskTableBody.innerHTML = html;
+
+      // Attach click handlers
+      taskTableBody.querySelectorAll('.task-row').forEach(function(row) {
+        row.addEventListener('click', function() {
+          var id = row.getAttribute('data-id');
+          expandedTaskId = expandedTaskId === id ? null : id;
+          loadTasks();
+        });
+      });
+
+      // Pagination
+      var totalPages = Math.ceil(total / PAGE_SIZE);
+      if (totalPages <= 1) {
+        paginationDiv.innerHTML = '';
+      } else {
+        var pagHtml = '<button class="btn" id="prevPage"' + (currentPage === 0 ? ' disabled' : '') + '>&lt; Prev</button>';
+        pagHtml += '<span>Page ' + (currentPage + 1) + ' of ' + totalPages + '</span>';
+        pagHtml += '<button class="btn" id="nextPage"' + (currentPage >= totalPages - 1 ? ' disabled' : '') + '>Next &gt;</button>';
+        paginationDiv.innerHTML = pagHtml;
+
+        document.getElementById('prevPage').addEventListener('click', function() {
+          if (currentPage > 0) { currentPage--; loadTasks(); }
+        });
+        document.getElementById('nextPage').addEventListener('click', function() {
+          if (currentPage < totalPages - 1) { currentPage++; loadTasks(); }
+        });
+      }
+
+    } catch(e) {
+      // silently fail
+    }
+  }
+
+  // ---- Load queue status ----
+  async function loadQueue() {
+    try {
+      var resp = await apiFetch('/queue');
+      if (!resp.ok) return;
+      var data = await resp.json();
+      var len = data.length || 0;
+      queueBadge.textContent = 'Queue: ' + len;
+      if (len > 0) {
+        queueBadge.classList.add('has-items');
+      } else {
+        queueBadge.classList.remove('has-items');
+      }
+    } catch(e) {
+      // silently fail
+    }
+  }
+
+  // ---- Submit task ----
+  submitTaskBtn.addEventListener('click', async function() {
+    var machineId = machineSelect.value;
+    var prompt = promptInput.value.trim();
+    var workingDir = workDirInput.value.trim() || undefined;
+    var pin = pinInput.value.trim() || undefined;
+
+    if (!machineId) { showToast('Select an agent or machine', 'error'); return; }
+    if (!prompt) { showToast('Enter a prompt', 'error'); return; }
+
+    // Save PIN to sessionStorage if checkbox is checked
+    if (rememberPin.checked && pin) {
+      sessionStorage.setItem('dispatch_pin', pin);
+    }
+
+    submitTaskBtn.disabled = true;
+    try {
+      var body = { machineId: machineId, prompt: prompt };
+      if (workingDir) body.workingDir = workingDir;
+      if (pin) body.pin = pin;
+
+      var resp = await apiFetch('/task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      var data = await resp.json();
+      if (resp.ok) {
+        if (data.queued) {
+          showToast('Task queued (position ' + data.queuePosition + '): ' + truncate(data.task.id, 8), 'success');
+        } else {
+          showToast('Task submitted: ' + truncate(data.id, 8), 'success');
+        }
+        promptInput.value = '';
+        loadTasks();
+        loadMachines();
+        loadQueue();
+      } else if (data.retryAfterMinutes) {
+        showToast('Locked out! Retry after ' + data.retryAfterMinutes + ' minute(s)', 'error');
+      } else {
+        showToast('Error: ' + (data.error || 'Unknown'), 'error');
+      }
+    } catch(e) {
+      showToast('Failed to submit task', 'error');
+    } finally {
+      submitTaskBtn.disabled = false;
+    }
+  });
+
+  // ---- Filters ----
+  filterStatus.addEventListener('change', function() { currentPage = 0; loadTasks(); });
+  filterMachine.addEventListener('change', function() { currentPage = 0; loadTasks(); });
+
+  // ---- Auto-refresh ----
+  function startRefresh() {
+    stopRefresh();
+    refreshTimer = setInterval(function() {
+      checkRelay();
+      loadMachines();
+      loadTasks();
+      loadQueue();
+    }, 5000);
+  }
+
+  function stopRefresh() {
+    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+  }
+
+  autoRefreshBtn.addEventListener('click', function() {
+    autoRefresh = !autoRefresh;
+    autoRefreshBtn.textContent = 'Auto-Refresh: ' + (autoRefresh ? 'ON' : 'OFF');
+    if (autoRefresh) {
+      autoRefreshBtn.classList.add('active');
+      startRefresh();
+    } else {
+      autoRefreshBtn.classList.remove('active');
+      stopRefresh();
+    }
+  });
+
+  // ---- Settings modal ----
+  settingsBtn.addEventListener('click', function() {
+    relayUrlInput.value = relayUrl;
+    tokenInput.value = authToken;
+    settingsModal.classList.add('open');
+  });
+  settingsCancelBtn.addEventListener('click', function() {
+    settingsModal.classList.remove('open');
+  });
+  settingsModal.addEventListener('click', function(e) {
+    if (e.target === settingsModal) settingsModal.classList.remove('open');
+  });
+  settingsSaveBtn.addEventListener('click', function() {
+    var val = relayUrlInput.value.trim();
+    if (val) {
+      relayUrl = val;
+      localStorage.setItem('dispatch_relay_url', relayUrl);
+      authToken = tokenInput.value.trim();
+      localStorage.setItem('dispatch_auth_token', authToken);
+      showToast('Settings updated', 'success');
+      settingsModal.classList.remove('open');
+      refreshAll();
+    }
+  });
+
+  // ---- Init ----
+  function refreshAll() {
+    checkRelay();
+    loadMachines();
+    loadTasks();
+    loadQueue();
+  }
+
+  refreshAll();
+  if (autoRefresh) startRefresh();
+})();
+</script>
+</body>
+</html>
