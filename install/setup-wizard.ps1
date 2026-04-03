@@ -1386,7 +1386,16 @@ function Build-ConfigJson {
                 "C:/Windows",
                 "C:/Program Files",
                 "C:/Program Files (x86)",
-                'C:/Users/*/AppData'
+                "C:/Users/*/AppData",
+                "C:/Users/*/.ssh",
+                "C:/Users/*/.aws",
+                "C:/Users/*/.azure",
+                "C:/Users/*/.kube",
+                "C:/Users/*/.docker",
+                "C:/Users/*/.gnupg",
+                "C:/ProgramData",
+                "C:/Recovery",
+                'C:/$Recycle.Bin'
             )
             tls = [ordered]@{
                 enabled = $script:cbEnableTLS.Checked

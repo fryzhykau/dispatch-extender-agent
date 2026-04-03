@@ -117,7 +117,7 @@ $script:Config = @{
     sharedSecret       = ""
     defaultWorkingDir  = "C:\workspace"
     allowedDirs        = @("C:\workspace")
-    denyDirs           = @("C:\Windows", "C:\Program Files", "C:\Program Files (x86)", "C:\Users\*\AppData")
+    denyDirs           = @("C:\Windows", "C:\Program Files", "C:\Program Files (x86)", "C:\Users\*\AppData", "C:\Users\*\.ssh", "C:\Users\*\.aws", "C:\Users\*\.azure", "C:\Users\*\.kube", "C:\Users\*\.docker", "C:\Users\*\.gnupg", "C:\ProgramData", "C:\Recovery", "C:\`$Recycle.Bin")
     keepAwake          = $true
     enableTls          = $false
     installService     = $false
@@ -633,7 +633,7 @@ $script:txtDenied.Font = $FontMonoSmall
 $script:txtDenied.BackColor = $ColorInputBg
 $script:txtDenied.ForeColor = $ColorWhite
 $script:txtDenied.BorderStyle = "FixedSingle"
-$script:txtDenied.Text = "C:\Windows`r`nC:\Program Files`r`nC:\Program Files (x86)`r`nC:\Users\*\AppData"
+$script:txtDenied.Text = "C:\Windows`r`nC:\Program Files`r`nC:\Program Files (x86)`r`nC:\Users\*\AppData`r`nC:\Users\*\.ssh`r`nC:\Users\*\.aws`r`nC:\Users\*\.azure`r`nC:\Users\*\.kube`r`nC:\Users\*\.docker`r`nC:\Users\*\.gnupg`r`nC:\ProgramData`r`nC:\Recovery`r`nC:\`$Recycle.Bin"
 $p3.Controls.Add($script:txtDenied)
 
 New-StyledLabel -Parent $p3 -Text "The agent will only execute tasks in allowed directories.`nSystem directories are blocked for safety." -X 20 -Y 336 -Width 430 -Height 36 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
@@ -925,7 +925,7 @@ function Collect-Config {
         $script:Config.sharedSecret = $script:txtBasicSecret.Text.Trim()
         $script:Config.defaultWorkingDir = "C:\workspace"
         $script:Config.allowedDirs = @("C:\workspace")
-        $script:Config.denyDirs = @("C:\Windows", "C:\Program Files", "C:\Program Files (x86)", "C:\Users\*\AppData")
+        $script:Config.denyDirs = @("C:\Windows", "C:\Program Files", "C:\Program Files (x86)", "C:\Users\*\AppData", "C:\Users\*\.ssh", "C:\Users\*\.aws", "C:\Users\*\.azure", "C:\Users\*\.kube", "C:\Users\*\.docker", "C:\Users\*\.gnupg", "C:\ProgramData", "C:\Recovery", "C:\`$Recycle.Bin")
         $script:Config.keepAwake = $true
         $script:Config.enableTls = $false
         $script:Config.installService = $false

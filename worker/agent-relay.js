@@ -342,8 +342,10 @@ function handleTask(msg) {
     `   assessment. If in doubt, redact first and note what was redacted.`,
     `9. Do NOT read or output the contents of: .env*, *.pem, *.key, *credentials*,`,
     `   *secret*, *password*, *token* files. Describe their existence only.`,
-    `10. Do NOT run or output results of system reconnaissance commands:`,
+    `10. Do NOT access credential stores: ~/.ssh, ~/.aws, ~/.azure, ~/.kube, ~/.docker, ~/.gnupg, or any dotfile directories containing keys or tokens.`,
+    `11. Do NOT run or output results of system reconnaissance commands:`,
     `    whoami, hostname, systeminfo, ipconfig, net user, env, printenv,`,
+    `    reg query, reg export, wmic, Get-Credential,`,
     `    registry queries, or any command that reveals system configuration,`,
     `    user accounts, network settings, or installed software details.`,
     `    If the task genuinely needs system info, provide ONLY what is directly`,
@@ -457,6 +459,8 @@ function handleTask(msg) {
         { name: 'Private key', pattern: /-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/ },
         { name: 'Bearer token', pattern: /Bearer\s+[A-Za-z0-9\-._~+/]{20,}/ },
         { name: 'Connection string', pattern: /(?:mongodb|postgres|mysql|redis):\/\/[^\s]{10,}/i },
+        { name: 'SSH key', pattern: /-----BEGIN (?:OPENSSH|DSA|ECDSA) PRIVATE KEY-----/ },
+        { name: 'Azure credential', pattern: /(?:azure|AZURE).*(?:secret|key|token|password)\s*[:=]\s*\S{8,}/i },
       ];
 
       for (const { name, pattern } of sensitivePatterns) {

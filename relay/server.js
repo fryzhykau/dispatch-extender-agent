@@ -466,6 +466,9 @@ async function handleRequest(req, res) {
       { pattern: /(?:whoami|hostname|systeminfo|ipconfig|ifconfig|net\s+user)\s*[|>]/i, reason: 'System info exfiltration with output redirect' },
       { pattern: /(?:dump|export|exfiltrate|steal|extract)\s+.*(?:password|credential|secret|token|key)/i, reason: 'Credential exfiltration attempt' },
       { pattern: /curl\s+.*(?:webhook|requestbin|ngrok|burp|pipedream)/i, reason: 'Data exfiltration via external service' },
+      { pattern: /\b(reg\s+query|reg\s+export|wmic)\b/i, reason: 'Windows registry/WMI access' },
+      { pattern: /\b(Get-Credential|Export-PSCredential|ConvertTo-SecureString)\b/i, reason: 'PowerShell credential access' },
+      { pattern: /\\\\[^\s\\]+\\[^\s\\]+/i, reason: 'UNC/SMB path access attempt' },
     ];
 
     for (const { pattern, reason } of unsafePatterns) {
