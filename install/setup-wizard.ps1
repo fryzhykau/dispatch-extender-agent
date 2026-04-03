@@ -1565,7 +1565,10 @@ $btnNext.Add_Click({
             $cmdArgs = "/K title Dispatch Relay & node relay/server.js"
             Start-Process cmd.exe -ArgumentList $cmdArgs -WorkingDirectory $ProjectRoot -WindowStyle Minimized
             Start-Sleep -Seconds 3
-            Start-Process "$proto`://localhost:$port/dashboard"
+            # Pass the shared secret as a URL param so the dashboard auto-configures
+            $secret = $script:txtSecretCoord.Text
+            $encodedSecret = [System.Uri]::EscapeDataString($secret)
+            Start-Process "$proto`://localhost:$port/dashboard?token=$encodedSecret"
         }
         $form.Close()
         return

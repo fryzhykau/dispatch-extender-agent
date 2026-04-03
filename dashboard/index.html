@@ -606,6 +606,16 @@
   // ---- State ----
   let relayUrl = localStorage.getItem('dispatch_relay_url') || 'http://localhost:7070';
   let authToken = localStorage.getItem('dispatch_auth_token') || '';
+
+  // Auto-import token from URL parameter (set by the setup wizard)
+  var urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has('token')) {
+    authToken = urlParams.get('token');
+    localStorage.setItem('dispatch_auth_token', authToken);
+    // Remove token from URL for security (don't leave it in browser history)
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+
   let autoRefresh = true;
   let refreshTimer = null;
   let currentPage = 0;
