@@ -8,8 +8,8 @@
 ; Build:    Run installer/build.ps1 or invoke ISCC.exe directly.
 ; ==========================================================================
 
+#include "version.iss"
 #define MyAppName      "Dispatch Orchestrator"
-#define MyAppVersion   "1.0.0"
 #define MyAppPublisher "Dispatch Orchestrator"
 #define MyAppURL       "https://github.com/fryzhykau/dispatch-extender-agent"
 #define MyAppExeName   "node.exe"
@@ -85,6 +85,9 @@ Source: "assets\icon.ico"; DestDir: "{app}\installer\assets"; Flags: ignoreversi
 ; Launcher scripts (with logging)
 Source: "launch-wizard.ps1"; DestDir: "{app}\installer"; Flags: ignoreversion
 Source: "launch-dashboard.ps1"; DestDir: "{app}\installer"; Flags: ignoreversion
+
+; Images for setup wizard
+Source: "..\logo\integration-diagram-simple.png"; DestDir: "{app}\installer\assets"; DestName: "integration-diagram.png"; Flags: ignoreversion
 
 ; --------------------------------------------------------------------------
 ; Registry entries

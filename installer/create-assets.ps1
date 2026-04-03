@@ -162,7 +162,8 @@ function New-WizardBanner([System.Drawing.Bitmap]$logo, [string]$title, [string]
     $fontVer = New-Object System.Drawing.Font("Segoe UI", 14, [System.Drawing.FontStyle]::Regular)
     $dimBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(120, 180, 180, 200))
     $verRect = New-Object System.Drawing.RectangleF(0, 740, $bannerWidth, 40)
-    $g.DrawString("v1.0.0", $fontVer, $dimBrush, $verRect, $sf)
+    $pkgJson = Get-Content (Join-Path $ProjectRoot "package.json") -Raw | ConvertFrom-Json
+    $g.DrawString("v$($pkgJson.version)", $fontVer, $dimBrush, $verRect, $sf)
 
     $g.Dispose()
     return $banner

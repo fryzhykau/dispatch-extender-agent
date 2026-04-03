@@ -7,3 +7,4 @@ certs/
 dist/
 installer/assets/*.bmp
 installer/assets/*.ico
+installer/version.iss

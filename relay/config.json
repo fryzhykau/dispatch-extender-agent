@@ -1,5 +1,5 @@
 {
-  "port": 7070,
+  "port": 7099,
   "sharedSecret": "CHANGE-ME-generate-a-real-secret",
   "machines": [
     {
@@ -9,15 +9,10 @@
     }
   ],
   "tls": {
-    "enabled": false,
-    "certFile": "../certs/server.crt",
-    "keyFile": "../certs/server.key",
-    "caFile": "../certs/ca.crt"
+    "enabled": false
   },
   "discovery": {
-    "enabled": true,
-    "broadcastPort": 7071,
-    "intervalMs": 5000
+    "enabled": false
   },
   "heartbeat": {
     "intervalMs": 30000,
@@ -28,8 +23,8 @@
   },
   "rateLimiting": {
     "enabled": true,
-    "maxTasksPerMinute": 10,
-    "maxTasksPerHour": 100
+    "maxTasksPerMinute": 20,
+    "maxTasksPerHour": 200
   },
   "limits": {
     "maxPromptLength": 50000,
@@ -37,7 +32,7 @@
     "maxRequestBodyBytes": 102400
   },
   "keepAwake": {
-    "enabled": true
+    "enabled": false
   },
   "queue": {
     "enabled": true,
@@ -45,7 +40,7 @@
   },
   "pin": {
     "enabled": true,
-    "code": "1234",
+    "code": "9999",
     "maxAttempts": 5,
     "lockoutMinutes": 15
   }

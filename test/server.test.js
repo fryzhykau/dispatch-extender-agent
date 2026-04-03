@@ -382,6 +382,19 @@ describe('Relay server integration tests', () => {
   });
 
   // =========================================================================
+  // GET /favicon.ico
+  // =========================================================================
+
+  describe('GET /favicon.ico', () => {
+    it('should return 204 with no body (no auth required)', async () => {
+      const res = await fetch(`${BASE_URL}/favicon.ico`);
+      assert.equal(res.status, 204);
+      const body = await res.text();
+      assert.equal(body, '', 'Expected empty body for 204 response');
+    });
+  });
+
+  // =========================================================================
   // WebSocket Authentication
   // =========================================================================
 

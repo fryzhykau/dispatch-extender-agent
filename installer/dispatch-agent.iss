@@ -8,8 +8,8 @@
 ; Build:    Run installer/build.ps1 -Target agent
 ; ==========================================================================
 
+#include "version.iss"
 #define MyAppName      "Dispatch Agent"
-#define MyAppVersion   "1.0.0"
 #define MyAppPublisher "Dispatch Orchestrator"
 #define MyAppURL       "https://github.com/fryzhykau/dispatch-extender-agent"
 #define MyAppExeName   "node.exe"
@@ -76,6 +76,7 @@ Source: "..\install\generate-certs.ps1"; DestDir: "{app}\install";   Flags: igno
 
 ; Agent setup wizard
 Source: "agent-setup-wizard.ps1";        DestDir: "{app}\installer"; Flags: ignoreversion
+Source: "launch-agent-wizard.ps1";       DestDir: "{app}\installer"; Flags: ignoreversion
 
 ; Minimal package.json for npm install (only ws dependency)
 Source: "agent-package.json";            DestDir: "{app}"; DestName: "package.json"; Flags: ignoreversion
@@ -138,9 +139,9 @@ Filename: "cmd.exe"; Parameters: "/C npm install --production"; \
 
 ; Launch the agent setup wizard after installation completes
 Filename: "powershell.exe"; \
-  Parameters: "-ExecutionPolicy Bypass -File ""{app}\installer\agent-setup-wizard.ps1"""; \
+  Parameters: "-ExecutionPolicy Bypass -File ""{app}\installer\launch-agent-wizard.ps1"""; \
   WorkingDir: "{app}"; Description: "Launch the Agent Setup Wizard now"; \
-  Flags: nowait postinstall skipifsilent shellexec; Check: NodeJsInstalled
+  Flags: postinstall skipifsilent waituntilterminated
 
 ; --------------------------------------------------------------------------
 ; Uninstall actions — clean up Windows services

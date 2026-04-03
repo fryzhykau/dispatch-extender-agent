@@ -1,5 +1,13 @@
 import dgram from 'node:dgram';
 import os from 'node:os';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf-8'));
+const APP_VERSION = pkg.version;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -61,25 +69,35 @@ function getLocalIP() {
  * @param {number} intervalMs     Milliseconds between broadcasts (default 5000)
  * @returns {{ stop: () => void }}
  */
-export function startBroadcast(broadcastPort = 7071, relayPort = 7070, intervalMs = 5000) {
+export function startBroadcast(broadcastPort = 7071, relayPort = 7070, intervalMs = 5000, sharedSecret = '') {
   const socket = dgram.createSocket('udp4');
   let timer = null;
 
   const localIP = getLocalIP();
 
-  const message = JSON.stringify({
+  const payload = JSON.stringify({
     type: 'dispatch-relay',
     host: localIP,
     port: relayPort,
-    version: '1.0.0',
+    version: APP_VERSION,
   });
 
-  const buf = Buffer.from(message);
+  // Sign the payload with HMAC so workers can verify authenticity
+  function buildSignedMessage() {
+    const ts = Date.now().toString();
+    const hmac = sharedSecret
+      ? crypto.createHmac('sha256', sharedSecret).update(ts + payload).digest('hex')
+      : '';
+    return JSON.stringify({ payload, ts, hmac });
+  }
+
+  let buf = Buffer.from(buildSignedMessage());
 
   socket.bind(() => {
     socket.setBroadcast(true);
 
     timer = setInterval(() => {
+      buf = Buffer.from(buildSignedMessage());
       socket.send(buf, 0, buf.length, broadcastPort, '255.255.255.255', (err) => {
         if (err) {
           console.error('[discovery] Broadcast send error:', err.message);

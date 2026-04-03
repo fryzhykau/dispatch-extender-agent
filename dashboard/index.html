@@ -842,7 +842,7 @@
         html += '<tr class="task-row" data-id="' + t.id + '">' +
           '<td title="' + escapeHtml(t.id) + '">' + truncate(t.id, 8) + '</td>' +
           '<td>' + escapeHtml(t.machineId) + '</td>' +
-          '<td><span class="status-badge ' + t.status + '">' + t.status + '</span></td>' +
+          '<td><span class="status-badge ' + escapeHtml(t.status) + '">' + escapeHtml(t.status) + '</span></td>' +
           '<td class="prompt-cell" title="' + escapeHtml(t.prompt) + '">' + escapeHtml(truncate(t.prompt, 60)) + '</td>' +
           '<td>' + formatDuration(t.durationMs) + '</td>' +
           '<td>' + formatDate(t.createdAt) + '</td>' +

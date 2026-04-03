@@ -125,15 +125,20 @@ function dispatchToWorker(task, worker, machineId) {
 // HTTP helpers
 // ---------------------------------------------------------------------------
 
-function cors(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+function cors(req, res) {
+  // Restrict CORS to the request's own origin (dashboard on same host)
+  const origin = req && req.headers && req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Content-Type', 'application/json');
 }
 
 function sendJSON(res, statusCode, body) {
-  cors(res);
+  cors(res._req, res);
   res.writeHead(statusCode);
   res.end(JSON.stringify(body));
 }
@@ -144,8 +149,8 @@ function authenticate(req) {
   return auth.slice(7) === SHARED_SECRET;
 }
 
-function sendUnauthorized(res) {
-  cors(res);
+function sendUnauthorized(req, res) {
+  cors(req, res);
   res.setHeader('WWW-Authenticate', 'Bearer');
   res.writeHead(401);
   res.end(JSON.stringify({ error: 'Unauthorized' }));
@@ -219,12 +224,13 @@ function sanitizeWorkingDir(dir) {
 // ---------------------------------------------------------------------------
 
 async function handleRequest(req, res) {
+  res._req = req; // Attach req to res so sendJSON can access it for CORS
   const url = new URL(req.url, `http://${req.headers.host}`);
   const pathname = url.pathname;
 
   // CORS preflight
   if (req.method === 'OPTIONS') {
-    cors(res);
+    cors(req, res);
     res.writeHead(204);
     res.end();
     return;
@@ -284,7 +290,7 @@ async function handleRequest(req, res) {
     const auth = req.headers['authorization'];
     const reason = !auth ? 'missing header' : !auth.startsWith('Bearer ') ? 'malformed header' : 'wrong token';
     audit.security('auth.failed', { ip, reason });
-    sendUnauthorized(res);
+    sendUnauthorized(req, res);
     return;
   }
 
@@ -356,7 +362,7 @@ async function handleRequest(req, res) {
       if (!check.allowed) {
         const ip = req.socket.remoteAddress;
         audit.warn('rate.limited', { ip, currentCount: rateLimiter.timestamps.length });
-        cors(res);
+        cors(req, res);
         res.setHeader('Retry-After', String(check.retryAfterSeconds));
         res.writeHead(429);
         res.end(JSON.stringify({ error: 'Rate limit exceeded', retryAfterSeconds: check.retryAfterSeconds }));
@@ -655,7 +661,8 @@ async function handleRequest(req, res) {
 
       sendJSON(res, 200, entries);
     } catch (err) {
-      sendJSON(res, 500, { error: 'Failed to read audit log', details: err.message });
+      console.error('[relay] Failed to read audit log:', err.message);
+      sendJSON(res, 500, { error: 'Failed to read audit log' });
     }
     return;
   }
@@ -734,6 +741,16 @@ async function main() {
         }
 
         machineId = msg.machineId;
+
+        // Validate machineId format
+        if (!machineId || typeof machineId !== 'string' || machineId.length > 128 ||
+            !/^[a-zA-Z0-9_\-\.]+$/.test(machineId)) {
+          audit.security('auth.failed', { ip: ws._socket.remoteAddress, reason: 'invalid machineId' });
+          ws.close(4004, 'Invalid machineId');
+          clearTimeout(registerTimeout);
+          return;
+        }
+
         registered = true;
         clearTimeout(registerTimeout);
 
@@ -866,7 +883,7 @@ async function main() {
       const { startBroadcast } = await import('./discovery.js');
       const broadcastPort = config.discovery.broadcastPort ?? 7071;
       const intervalMs = config.discovery.intervalMs ?? 5000;
-      discoveryHandle = startBroadcast(broadcastPort, PORT, intervalMs);
+      discoveryHandle = startBroadcast(broadcastPort, PORT, intervalMs, SHARED_SECRET);
       console.log('[relay] Discovery broadcasting is active');
     }
   });

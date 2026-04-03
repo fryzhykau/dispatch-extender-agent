@@ -1,4 +1,47 @@
 import dgram from 'node:dgram';
+import crypto from 'node:crypto';
+
+const MAX_DISCOVERY_AGE_MS = 30_000; // reject broadcasts older than 30s
+
+/**
+ * Verify and parse a signed discovery message.
+ * Returns the inner payload if valid, or null if invalid/unsigned.
+ */
+function parseDiscoveryMessage(raw, sharedSecret) {
+  try {
+    const envelope = JSON.parse(raw.toString());
+
+    // Support legacy unsigned format for backward compatibility
+    if (envelope.type === 'dispatch-relay' && envelope.host && envelope.port) {
+      if (!sharedSecret) return envelope; // no secret configured, accept unsigned
+      return null; // secret configured but message unsigned — reject
+    }
+
+    // Signed envelope format: { payload, ts, hmac }
+    if (!envelope.payload || !envelope.ts || !envelope.hmac) return null;
+
+    // Verify timestamp freshness
+    const age = Math.abs(Date.now() - parseInt(envelope.ts, 10));
+    if (age > MAX_DISCOVERY_AGE_MS) return null;
+
+    // Verify HMAC
+    if (sharedSecret) {
+      const expected = crypto.createHmac('sha256', sharedSecret)
+        .update(envelope.ts + envelope.payload).digest('hex');
+      if (!crypto.timingSafeEqual(Buffer.from(envelope.hmac, 'hex'), Buffer.from(expected, 'hex'))) {
+        return null;
+      }
+    }
+
+    const data = JSON.parse(envelope.payload);
+    if (data.type === 'dispatch-relay' && data.host && data.port) {
+      return data;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Discover a relay on the local network via UDP broadcast.
@@ -7,9 +50,10 @@ import dgram from 'node:dgram';
  *
  * @param {number} broadcastPort  UDP port to listen on (default 7071)
  * @param {number} timeout        Timeout in ms (default 15000)
+ * @param {string} sharedSecret   Shared secret for HMAC verification (optional)
  * @returns {Promise<{ host: string, port: number }>}
  */
-export function discoverRelay(broadcastPort = 7071, timeout = 15000) {
+export function discoverRelay(broadcastPort = 7071, timeout = 15000, sharedSecret = '') {
   return new Promise((resolve, reject) => {
     const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
 
@@ -19,15 +63,11 @@ export function discoverRelay(broadcastPort = 7071, timeout = 15000) {
     }, timeout);
 
     socket.on('message', (msg) => {
-      try {
-        const data = JSON.parse(msg.toString());
-        if (data.type === 'dispatch-relay' && data.host && data.port) {
-          clearTimeout(timer);
-          socket.close();
-          resolve({ host: data.host, port: data.port });
-        }
-      } catch {
-        // ignore malformed packets
+      const data = parseDiscoveryMessage(msg, sharedSecret);
+      if (data) {
+        clearTimeout(timer);
+        socket.close();
+        resolve({ host: data.host, port: data.port });
       }
     });
 
@@ -47,19 +87,16 @@ export function discoverRelay(broadcastPort = 7071, timeout = 15000) {
  *
  * @param {(relay: { host: string, port: number }) => void} callback
  * @param {number} broadcastPort  UDP port to listen on (default 7071)
+ * @param {string} sharedSecret   Shared secret for HMAC verification (optional)
  * @returns {{ stop: () => void }}
  */
-export function listenForRelay(callback, broadcastPort = 7071) {
+export function listenForRelay(callback, broadcastPort = 7071, sharedSecret = '') {
   const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
 
   socket.on('message', (msg) => {
-    try {
-      const data = JSON.parse(msg.toString());
-      if (data.type === 'dispatch-relay' && data.host && data.port) {
-        callback({ host: data.host, port: data.port });
-      }
-    } catch {
-      // ignore malformed packets
+    const data = parseDiscoveryMessage(msg, sharedSecret);
+    if (data) {
+      callback({ host: data.host, port: data.port });
     }
   });
 

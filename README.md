@@ -353,7 +353,7 @@ Set in `relay/config.json` under `loadBalancing.strategy`.
 
 ### Auto-Discovery
 
-Workers can find the relay automatically on the local network via UDP broadcast. Set `coordinatorHost` to `"auto"` in worker config. See [Networking & Connectivity](#networking--connectivity) for details on LAN vs public internet setups.
+Workers can find the relay automatically on the local network via UDP broadcast. Set `coordinatorHost` to `"auto"` in worker config. Discovery skips virtual adapter IPs (WSL, Hyper-V, VMware, Docker, VirtualBox) and virtual IP prefixes (172.16-31.x, 169.254.x link-local) to ensure the broadcast announces a reachable physical/Wi-Fi address. See [Networking & Connectivity](#networking--connectivity) for details on LAN vs public internet setups.
 
 ### Heartbeat Monitoring
 
@@ -367,10 +367,13 @@ Both the relay and workers prevent Windows from sleeping while active. Uses the 
 
 A real-time web dashboard at `http://localhost:7070/dashboard` showing:
 - Connected agents with status, capabilities, and health
+- Agent count displayed in the Submit Task section
 - Task history with filtering and pagination
 - Task submission form with agent targeting
 - Queue status indicator
 - Auto-refresh (5 second interval, toggleable)
+
+All API calls from the dashboard are gated behind the auth token — no unauthenticated requests are made on page load.
 
 ## Building Installers
 
@@ -387,7 +390,7 @@ Or download manually from [jrsoftware.org/isdl.php](https://jrsoftware.org/isdl.
 ### Build the installers
 
 ```bash
-# Step 1: Generate banner images and icon for the installer UI
+# Step 1: Generate banner images and icons from dedicated logo files in logo/
 npm run build:assets
 
 # Step 2: Build both installers
@@ -397,7 +400,8 @@ npm run build:all-installers
 Or build individually:
 
 ```bash
-npm run build:installer          # Coordinator-only: dist/DispatchOrchestratorSetup.exe
+npm run version:sync             # Sync version from package.json to installers
+npm run build:installer          # Orchestrator:    dist/DispatchOrchestratorSetup.exe
 npm run build:agent-installer    # Agent-only:       dist/DispatchAgentSetup.exe
 ```
 
@@ -405,8 +409,10 @@ Output goes to `dist/` with SHA256 checksums.
 
 | Installer | Target Machine | What's included |
 |-----------|---------------|-----------------|
-| `DispatchOrchestratorSetup.exe` | Coordinator (Machine 1) | Relay, dashboard, coordinator, worker, full setup wizard |
+| `DispatchOrchestratorSetup.exe` | Orchestrator (Machine 1) | Relay, dashboard, orchestrator setup wizard |
 | `DispatchAgentSetup.exe` | Workers (Machine 2+) | Agent relay, discovery, keep-awake, agent setup wizard |
+
+The **orchestrator installer** has three Start Menu shortcuts: **Dashboard**, **Start Relay**, and **Setup**. The finish page offers two checkboxes: "Launch Setup Wizard" (checked by default) and "Start Relay and open Dashboard" (unchecked by default). The agent installer is separate, intended for worker machines only.
 
 Both installers:
 - Check for Node.js and Claude Code CLI prerequisites
@@ -414,6 +420,7 @@ Both installers:
 - Launch the setup wizard after installation
 - Create Start Menu shortcuts
 - Include an uninstaller that cleans up services
+- Write installer logs to `%ProgramData%\DispatchOrchestrator\logs\`
 
 ### Setup Wizard (without building an installer)
 
@@ -458,11 +465,17 @@ sc stop DispatchRelay
 ### Option B: Desktop Shortcuts (recommended for on-demand use)
 
 After installing, use the desktop shortcuts:
-1. **Start Relay** — double-click to start the coordinator relay server
-2. **Start Worker** / **Start Agent** — double-click to start the worker agent
-3. **Dispatch Dashboard** — opens the monitoring dashboard in your browser
 
-Start the relay first, then the workers. Each opens in its own console window — close the window to stop it.
+**Orchestrator machine:**
+1. **Start Relay** — double-click to start the coordinator relay server
+2. **Dispatch Dashboard** — opens the monitoring dashboard in your browser
+3. **Dispatch Orchestrator Setup** — re-run the setup wizard
+
+**Agent (worker) machines:**
+1. **Start Agent** — double-click to start the worker agent
+2. **Dispatch Agent Setup** — re-run the agent setup wizard
+
+Start the relay first, then the agents. Each opens in its own console window — close the window to stop it.
 
 ### Option C: Command Line
 
@@ -547,7 +560,7 @@ The uninstaller automatically stops and removes Windows services, deletes `node_
 All tests must pass before pushing to any branch:
 
 ```bash
-npm test             # Run all 66 tests (unit + integration)
+npm test             # Run all 129 tests (unit + integration)
 npm run pii-check    # Scan for personal information in source code
 npm run precommit    # Runs both pii-check and tests
 ```
@@ -557,9 +570,15 @@ npm run precommit    # Runs both pii-check and tests
 | Suite | File | Tests | What it covers |
 |-------|------|-------|----------------|
 | Registry | `test/registry.test.js` | 21 | SQLite CRUD, filtering, pagination, persistence |
-| Server | `test/server.test.js` | 18 | HTTP API auth, validation, WebSocket auth, rate limiting, path traversal |
+| Server | `test/server.test.js` | 19 | HTTP API auth, validation, WebSocket auth, rate limiting, path traversal, favicon |
 | Worker | `test/worker.test.js` | 13 | Path allowlist/denylist, normalization, traversal attacks |
 | Load Balancer | `test/load-balancer.test.js` | 14 | All 4 strategies, edge cases |
+| Config | `test/config.test.js` | 26 | Config loading, defaults, validation, merging |
+| Data Dir | `test/data-dir.test.js` | 5 | Data directory resolution, ProgramData fallback |
+| Keep Awake | `test/keep-awake.test.js` | 5 | Sleep prevention API, enable/disable, UInt32 safety |
+| Audit | `test/audit.test.js` | 9 | Structured JSONL logging, levels, rotation |
+| Queue | `test/queue.test.js` | 13 | Task queuing, drain on idle, max size limits |
+| Discovery | `test/discovery.test.js` | 4 | UDP broadcast, message format, virtual IP filtering, stop behavior |
 
 The server integration tests spawn a real relay process on port 7099 with a temporary config, so they validate the full stack end-to-end.
 
@@ -586,6 +605,26 @@ The server integration tests spawn a real relay process on port 7099 with a temp
 
 Windows-specific features (sleep prevention, NSSM services, PowerShell cert generation) will not work on other platforms. The core relay and worker logic (Node.js/WebSocket) is platform-agnostic in principle but has not been validated outside Windows.
 
+## Versioning
+
+The version is defined in `package.json` and synced to all other locations:
+
+```bash
+# Bump version (updates package.json and package-lock.json)
+npm version patch   # 1.0.0 → 1.0.1
+npm version minor   # 1.0.0 → 1.1.0
+npm version major   # 1.0.0 → 2.0.0
+
+# Sync version to Inno Setup installers
+npm run version:sync
+```
+
+The version propagates to: installer `.exe` metadata, discovery broadcast protocol, wizard banner images, and registry entries.
+
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
 ## License
 
-Private project.
+This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.

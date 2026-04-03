@@ -2,7 +2,12 @@
   "name": "dispatch-orchestrator",
   "version": "1.0.0",
   "description": "Multi-machine Claude Dispatch orchestrator — hub-and-spoke task routing over WebSocket",
-  "private": true,
+  "license": "MIT",
+  "author": "Fiodar Ryzhykau",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fryzhykau/dispatch-extender-agent.git"
+  },
   "type": "module",
   "engines": {
     "node": ">=18.0.0"
@@ -17,7 +22,8 @@
     "build:installer": "powershell -ExecutionPolicy Bypass -File installer/build.ps1",
     "build:agent-installer": "powershell -ExecutionPolicy Bypass -File installer/build.ps1 -Target agent",
     "build:all-installers": "powershell -ExecutionPolicy Bypass -File installer/build.ps1 -Target all",
-    "build:assets": "powershell -ExecutionPolicy Bypass -File installer/create-assets.ps1"
+    "build:assets": "powershell -ExecutionPolicy Bypass -File installer/create-assets.ps1",
+    "version:sync": "node scripts/sync-version.js"
   },
   "dependencies": {
     "sql.js": "^1.11.0",

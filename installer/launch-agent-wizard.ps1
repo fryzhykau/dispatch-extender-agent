@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Wrapper that launches the setup wizard with logging.
+    Wrapper that launches the agent setup wizard with logging.
     Called by the Inno Setup installer post-install step.
 #>
 
@@ -8,10 +8,10 @@ $ErrorActionPreference = "Stop"
 
 $ScriptDir   = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $AppRoot     = Split-Path -Parent $ScriptDir
-$WizardScript = Join-Path $AppRoot "install\setup-wizard.ps1"
+$WizardScript = Join-Path $AppRoot "installer\agent-setup-wizard.ps1"
 
 # Use ProgramData for logs (Program Files is read-only for non-admin)
-$LogDir  = Join-Path $env:ProgramData "DispatchOrchestrator\logs"
+$LogDir  = Join-Path $env:ProgramData "DispatchAgent\logs"
 $LogFile = Join-Path $LogDir "setup-wizard.log"
 
 if (-not (Test-Path $LogDir)) {
@@ -21,7 +21,7 @@ if (-not (Test-Path $LogDir)) {
 # Log basic diagnostics
 $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 $logHeader = @"
-=== Setup Wizard Launch Log ===
+=== Agent Setup Wizard Launch Log ===
 Timestamp:    $timestamp
 AppRoot:      $AppRoot
 WizardScript: $WizardScript
@@ -38,9 +38,10 @@ try {
     if (-not (Test-Path $WizardScript)) {
         $msg = "ERROR: Setup wizard script not found at: $WizardScript"
         $msg | Out-File -FilePath $LogFile -Append -Encoding UTF8
+        Add-Type -AssemblyName System.Windows.Forms
         [System.Windows.Forms.MessageBox]::Show(
             "Setup wizard not found.`n`nExpected: $WizardScript`nSee log: $LogFile",
-            "Dispatch Orchestrator", 0, 48) | Out-Null
+            "Dispatch Agent", 0, 48) | Out-Null
         exit 1
     }
 
@@ -50,14 +51,6 @@ try {
 
     $exitCode = $LASTEXITCODE
     "Wizard exited with code: $exitCode" | Out-File -FilePath $LogFile -Append -Encoding UTF8
-
-    # Write a marker so the dashboard launcher knows the wizard completed successfully
-    $markerFile = Join-Path $LogDir "setup-complete.marker"
-    if ($exitCode -eq 0) {
-        "OK" | Out-File -FilePath $markerFile -Encoding UTF8 -Force
-    } else {
-        Remove-Item $markerFile -ErrorAction SilentlyContinue
-    }
 }
 catch {
     $errMsg = "ERROR: $($_.Exception.Message)`n$($_.ScriptStackTrace)"
@@ -66,6 +59,6 @@ catch {
     Add-Type -AssemblyName System.Windows.Forms
     [System.Windows.Forms.MessageBox]::Show(
         "Setup wizard failed to launch.`n`n$($_.Exception.Message)`n`nSee log: $LogFile",
-        "Dispatch Orchestrator", 0, 48) | Out-Null
+        "Dispatch Agent", 0, 48) | Out-Null
     exit 1
 }

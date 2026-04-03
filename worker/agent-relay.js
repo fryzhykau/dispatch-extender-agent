@@ -255,7 +255,7 @@ function handleTask(msg) {
     ["--print", "--dangerously-skip-permissions", prompt],
     {
       cwd,
-      shell: true,
+      shell: false,
       stdio: ["ignore", "pipe", "pipe"],
     }
   );
@@ -278,8 +278,16 @@ function handleTask(msg) {
     stdout += text;
   });
 
+  let stderrTruncated = false;
   child.stderr.on("data", (chunk) => {
-    stderr += chunk.toString();
+    if (stderrTruncated) return;
+    const text = chunk.toString();
+    if (stderr.length + text.length > MAX_OUTPUT_LENGTH) {
+      stderr += text.substring(0, MAX_OUTPUT_LENGTH - stderr.length);
+      stderrTruncated = true;
+      return;
+    }
+    stderr += text;
   });
 
   // Timeout handling
@@ -397,7 +405,7 @@ async function start() {
       const { discoverRelay } = await import("./discovery.js");
       const broadcastPort = discoveryConfig.broadcastPort ?? 7071;
       const timeoutMs = discoveryConfig.timeoutMs ?? 15000;
-      const relay = await discoverRelay(broadcastPort, timeoutMs);
+      const relay = await discoverRelay(broadcastPort, timeoutMs, config.sharedSecret || '');
       const protocol = tlsConfig.enabled ? "wss" : "ws";
       coordinatorHost = `${protocol}://${relay.host}:${relay.port}`;
       log(`Discovered relay at ${coordinatorHost}`);

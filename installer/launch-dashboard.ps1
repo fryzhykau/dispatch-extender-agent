@@ -16,6 +16,13 @@ if (-not (Test-Path $LogDir)) {
 $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 "[$timestamp] Starting relay from $AppRoot" | Out-File -FilePath $LogFile -Encoding UTF8 -Force
 
+# Only proceed if the setup wizard completed successfully
+$markerFile = Join-Path $LogDir "setup-complete.marker"
+if (-not (Test-Path $markerFile)) {
+    "[$timestamp] Skipping — setup wizard was cancelled or not completed" | Out-File -FilePath $LogFile -Append -Encoding UTF8
+    exit 0
+}
+
 try {
     # Start the relay in a minimized cmd window
     Start-Process cmd.exe -ArgumentList "/K title Dispatch Relay && node relay/server.js" `

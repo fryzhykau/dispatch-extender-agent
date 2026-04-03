@@ -38,8 +38,30 @@ if (-not (Test-Path (Join-Path $ProjectRoot "package.json"))) {
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+# Enable DPI awareness for crisp rendering on high-DPI displays.
+# SetProcessDPIAware tells Windows not to bitmap-scale the window.
+# All control layouts are designed at 96 DPI; we scale them by $DpiScale.
+Add-Type -TypeDefinition @"
+using System.Runtime.InteropServices;
+public class DpiHelper {
+    [DllImport("user32.dll")]
+    public static extern bool SetProcessDPIAware();
+}
+"@
+[DpiHelper]::SetProcessDPIAware() | Out-Null
+
 [System.Windows.Forms.Application]::EnableVisualStyles()
 [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false)
+
+# Calculate DPI scale factor (1.0 at 96 DPI, 1.5 at 144 DPI, 2.0 at 192 DPI)
+$tmpBmp = New-Object System.Drawing.Bitmap(1, 1)
+$tmpG = [System.Drawing.Graphics]::FromImage($tmpBmp)
+$script:DpiScale = $tmpG.DpiX / 96.0
+$tmpG.Dispose()
+$tmpBmp.Dispose()
+
+# Helper: scale a value by the DPI factor
+function S([double]$val) { [int][math]::Round($val * $script:DpiScale) }
 
 # ---------------------------------------------------------------------------
 # Color palette
@@ -71,12 +93,11 @@ $F_ICON     = New-Object System.Drawing.Font("Segoe UI", 22)
 # State
 # ---------------------------------------------------------------------------
 $script:CurrentStep = 0
-$script:SelectedRole = ""  # "coordinator" or "worker"
+$script:SelectedRole = "coordinator"  # Orchestrator installer is always coordinator
 $script:InstallCancelled = $false
 
 $StepNames = @(
     "Welcome",
-    "Role Selection",
     "Configuration",
     "TLS Settings",
     "Windows Service",
@@ -99,8 +120,8 @@ function New-StyledLabel {
     )
     $lbl = New-Object System.Windows.Forms.Label
     $lbl.Text = $Text
-    $lbl.Location = New-Object System.Drawing.Point($X, $Y)
-    $lbl.Size = New-Object System.Drawing.Size($Width, $Height)
+    $lbl.Location = New-Object System.Drawing.Point((S $X), (S $Y))
+    $lbl.Size = New-Object System.Drawing.Size((S $Width), (S $Height))
     $lbl.Font = $Font
     $lbl.ForeColor = $Color
     $lbl.BackColor = [System.Drawing.Color]::Transparent
@@ -120,8 +141,8 @@ function New-StyledTextBox {
         [switch]$ReadOnly
     )
     $tb = New-Object System.Windows.Forms.TextBox
-    $tb.Location = New-Object System.Drawing.Point($X, $Y)
-    $tb.Size = New-Object System.Drawing.Size($Width, $Height)
+    $tb.Location = New-Object System.Drawing.Point((S $X), (S $Y))
+    $tb.Size = New-Object System.Drawing.Size((S $Width), (S $Height))
     $tb.Font = $F_NORMAL
     $tb.BackColor = $C_FIELD_BG
     $tb.ForeColor = $C_TEXT
@@ -151,8 +172,8 @@ function New-StyledButton {
     )
     $btn = New-Object System.Windows.Forms.Button
     $btn.Text = $Text
-    $btn.Location = New-Object System.Drawing.Point($X, $Y)
-    $btn.Size = New-Object System.Drawing.Size($Width, $Height)
+    $btn.Location = New-Object System.Drawing.Point((S $X), (S $Y))
+    $btn.Size = New-Object System.Drawing.Size((S $Width), (S $Height))
     $btn.Font = $F_NORMAL
     $btn.BackColor = $BGColor
     $btn.ForeColor = $FGColor
@@ -175,8 +196,8 @@ function New-StyledCheckBox {
     )
     $cb = New-Object System.Windows.Forms.CheckBox
     $cb.Text = $Text
-    $cb.Location = New-Object System.Drawing.Point($X, $Y)
-    $cb.Size = New-Object System.Drawing.Size($Width, 22)
+    $cb.Location = New-Object System.Drawing.Point((S $X), (S $Y))
+    $cb.Size = New-Object System.Drawing.Size((S $Width), (S 22))
     $cb.Font = $F_NORMAL
     $cb.ForeColor = $C_TEXT
     $cb.BackColor = [System.Drawing.Color]::Transparent
@@ -195,8 +216,8 @@ function New-StyledComboBox {
         [int]$SelectedIndex = 0
     )
     $cb = New-Object System.Windows.Forms.ComboBox
-    $cb.Location = New-Object System.Drawing.Point($X, $Y)
-    $cb.Size = New-Object System.Drawing.Size($Width, 26)
+    $cb.Location = New-Object System.Drawing.Point((S $X), (S $Y))
+    $cb.Size = New-Object System.Drawing.Size((S $Width), (S 26))
     $cb.Font = $F_NORMAL
     $cb.BackColor = $C_FIELD_BG
     $cb.ForeColor = $C_TEXT
@@ -223,22 +244,32 @@ function New-SharedSecret {
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Dispatch Orchestrator Setup"
-$form.Size = New-Object System.Drawing.Size(716, 558)
+# Scale form to DPI so it's not tiny on high-DPI displays
+[int]$formW = [math]::Round(716 * $script:DpiScale)
+[int]$formH = [math]::Round(558 * $script:DpiScale)
+$form.Size = New-Object System.Drawing.Size($formW, $formH)
 $form.MinimumSize = $form.Size
 $form.MaximumSize = $form.Size
 $form.FormBorderStyle = "FixedSingle"
 $form.MaximizeBox = $false
 $form.StartPosition = "CenterScreen"
+$form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::None
 $form.BackColor = $C_BG
 $form.ForeColor = $C_TEXT
 $form.Font = $F_NORMAL
+
+# Set form icon from installer assets
+$icoPath = Join-Path $ProjectRoot "installer\assets\icon.ico"
+if (Test-Path $icoPath) {
+    $form.Icon = New-Object System.Drawing.Icon($icoPath)
+}
 
 # ===================================================================
 # SIDEBAR (step list)
 # ===================================================================
 $sidebar = New-Object System.Windows.Forms.Panel
 $sidebar.Location = New-Object System.Drawing.Point(0, 0)
-$sidebar.Size = New-Object System.Drawing.Size(190, 520)
+$sidebar.Size = New-Object System.Drawing.Size((S 190), (S 520))
 $sidebar.BackColor = $C_PANEL
 
 $sideTitle = New-StyledLabel -Text "Setup Steps" -X 14 -Y 14 -Width 170 -Height 28 -Font $F_SUBTITLE -Color $C_HIGHLIGHT
@@ -257,8 +288,8 @@ $form.Controls.Add($sidebar)
 # CONTENT AREA
 # ===================================================================
 $contentArea = New-Object System.Windows.Forms.Panel
-$contentArea.Location = New-Object System.Drawing.Point(190, 0)
-$contentArea.Size = New-Object System.Drawing.Size(510, 470)
+$contentArea.Location = New-Object System.Drawing.Point((S 190), 0)
+$contentArea.Size = New-Object System.Drawing.Size((S 510), (S 470))
 $contentArea.BackColor = $C_BG
 $form.Controls.Add($contentArea)
 
@@ -266,8 +297,8 @@ $form.Controls.Add($contentArea)
 # BOTTOM BUTTON BAR
 # ===================================================================
 $buttonBar = New-Object System.Windows.Forms.Panel
-$buttonBar.Location = New-Object System.Drawing.Point(190, 470)
-$buttonBar.Size = New-Object System.Drawing.Size(510, 50)
+$buttonBar.Location = New-Object System.Drawing.Point((S 190), (S 470))
+$buttonBar.Size = New-Object System.Drawing.Size((S 510), (S 50))
 $buttonBar.BackColor = $C_PANEL
 $form.Controls.Add($buttonBar)
 
@@ -292,41 +323,49 @@ $p0 = New-Object System.Windows.Forms.Panel
 $p0.Dock = "Fill"
 $p0.BackColor = $C_BG
 
-$p0.Controls.Add((New-StyledLabel -Text "Welcome to Dispatch Orchestrator Setup" -X 20 -Y 18 -Width 470 -Height 36 -Font $F_TITLE))
-$p0.Controls.Add((New-StyledLabel -Text "This orchestrator extends Anthropic's Dispatch into a hub-and-spoke model:`nyour phone dispatches tasks through a coordinator machine, which routes`nsubtasks to one or more named worker agents over a local WebSocket relay." `
-    -X 20 -Y 64 -Width 470 -Height 60 -Font $F_NORMAL -Color $C_TEXTDIM))
-$p0.Controls.Add((New-StyledLabel -Text "This wizard will configure this machine as a Coordinator or Worker." `
-    -X 20 -Y 130 -Width 470 -Height 24 -Font $F_NORMAL))
+$p0.Controls.Add((New-StyledLabel -Text "Welcome to Dispatch Orchestrator Setup" -X 20 -Y 14 -Width 470 -Height 36 -Font $F_TITLE))
+$p0.Controls.Add((New-StyledLabel -Text "This orchestrator extends Anthropic's Dispatch into a hub-and-spoke model:`nyour phone dispatches tasks through an orchestrator machine, which routes`nsubtasks to one or more named worker agents over a local WebSocket relay." `
+    -X 20 -Y 54 -Width 470 -Height 60 -Font $F_NORMAL -Color $C_TEXTDIM))
 
-$archDiagram = @"
-Phone (Claude App)
-  |
-  v
-Coordinator (Machine 1)        Relay Server (port 7070)
-  Claude Desktop + Dispatch --> WebSocket + HTTP API
-                                  |            |
-                            +-----+            +-----+
-                            v                        v
-                      Worker "CodeBot"         Worker "ResearchBot"
-                      (Machine 2)              (Machine 3)
-                      claude --print           claude --print
-"@
+# Architecture diagram image
+$diagramPath = Join-Path $ProjectRoot "logo\integration-diagram-simple.png"
+if (-not (Test-Path $diagramPath)) {
+    $diagramPath = Join-Path $ProjectRoot "installer\assets\integration-diagram.png"
+}
+if (Test-Path $diagramPath) {
+    # Pre-scale the diagram with high-quality bicubic to avoid PictureBox pixelation
+    $diagramSrc = [System.Drawing.Image]::FromFile($diagramPath)
+    $dw = S 360; $dh = S 240
+    $diagramScaled = New-Object System.Drawing.Bitmap($dw, $dh, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    $dg = [System.Drawing.Graphics]::FromImage($diagramScaled)
+    $dg.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $dg.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+    $dg.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+    $dg.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+    # Fit preserving aspect ratio
+    $ratioW = $dw / $diagramSrc.Width; $ratioH = $dh / $diagramSrc.Height
+    $ratio = [math]::Min($ratioW, $ratioH)
+    [int]$sw = [math]::Floor($diagramSrc.Width * $ratio)
+    [int]$sh = [math]::Floor($diagramSrc.Height * $ratio)
+    [int]$sx = [math]::Floor(($dw - $sw) / 2)
+    [int]$sy = [math]::Floor(($dh - $sh) / 2)
+    $dg.Clear([System.Drawing.Color]::Transparent)
+    $dg.DrawImage($diagramSrc, $sx, $sy, $sw, $sh)
+    $dg.Dispose()
+    $diagramSrc.Dispose()
 
-$archLabel = New-Object System.Windows.Forms.TextBox
-$archLabel.Multiline = $true
-$archLabel.ReadOnly = $true
-$archLabel.Text = $archDiagram
-$archLabel.Location = New-Object System.Drawing.Point(20, 168)
-$archLabel.Size = New-Object System.Drawing.Size(460, 175)
-$archLabel.Font = $F_MONO_SM
-$archLabel.ForeColor = $C_HIGHLIGHT
-$archLabel.BackColor = $C_PANEL
-$archLabel.BorderStyle = "FixedSingle"
-$archLabel.ScrollBars = "None"
-$archLabel.TabStop = $false
-$p0.Controls.Add($archLabel)
+    $diagramPic = New-Object System.Windows.Forms.PictureBox
+    $diagramPic.Location = New-Object System.Drawing.Point((S 60), (S 118))
+    $diagramPic.Size = New-Object System.Drawing.Size($dw, $dh)  # already scaled
+    $diagramPic.SizeMode = "CenterImage"
+    $diagramPic.BackColor = [System.Drawing.Color]::Transparent
+    $diagramPic.Image = $diagramScaled
+    $p0.Controls.Add($diagramPic)
+}
 
-$p0.Controls.Add((New-StyledLabel -Text "Click Next to begin." -X 20 -Y 360 -Width 460 -Height 24 -Font $F_NORMAL -Color $C_TEXTDIM))
+$p0.Controls.Add((New-StyledLabel -Text "This wizard will configure this machine as the Orchestrator." `
+    -X 20 -Y 368 -Width 470 -Height 24 -Font $F_NORMAL))
+$p0.Controls.Add((New-StyledLabel -Text "Click Next to begin." -X 20 -Y 396 -Width 460 -Height 24 -Font $F_NORMAL -Color $C_TEXTDIM))
 $p0.Controls.Add((New-StyledLabel -Text "Project root: $ProjectRoot" -X 20 -Y 430 -Width 460 -Height 20 -Font $F_SMALL -Color $C_TEXTDIM))
 $panels += $p0
 
@@ -356,7 +395,7 @@ $script:rbCoord.BackColor = [System.Drawing.Color]::Transparent
 $script:rbCoord.ForeColor = $C_TEXT
 $cardCoord.Controls.Add($script:rbCoord)
 
-$cardCoord.Controls.Add((New-StyledLabel -Text ([char]0x1F5A5) -X 40 -Y 10 -Width 40 -Height 40 -Font $F_ICON -Color $C_HIGHLIGHT))
+$cardCoord.Controls.Add((New-StyledLabel -Text ([System.Char]::ConvertFromUtf32(0x1F5A5)) -X 40 -Y 10 -Width 40 -Height 40 -Font $F_ICON -Color $C_HIGHLIGHT))
 $cardCoord.Controls.Add((New-StyledLabel -Text "Coordinator" -X 86 -Y 12 -Width 300 -Height 28 -Font $F_SUBTITLE))
 $cardCoord.Controls.Add((New-StyledLabel -Text "Runs the relay server. Receives tasks from your phone via Dispatch`nand routes them to workers. Only one coordinator per network." `
     -X 86 -Y 42 -Width 360 -Height 40 -Font $F_SMALL -Color $C_TEXTDIM))
@@ -417,10 +456,10 @@ $updateCardHighlight = {
 $script:rbCoord.Add_CheckedChanged($updateCardHighlight)
 $script:rbWorker.Add_CheckedChanged($updateCardHighlight)
 
-$panels += $p1
+# Role selection panel ($p1) is not added to panels — orchestrator is always coordinator
 
 # ---------------------------------------------------------------------------
-# STEP 2: Configuration (Dynamic)
+# STEP 1: Configuration (was STEP 2)
 # ---------------------------------------------------------------------------
 $p2 = New-Object System.Windows.Forms.Panel
 $p2.Dock = "Fill"
@@ -431,61 +470,81 @@ $p2.AutoScroll = $true
 # --- Coordinator config panel ---
 $pCoordCfg = New-Object System.Windows.Forms.Panel
 $pCoordCfg.Location = New-Object System.Drawing.Point(0, 0)
-$pCoordCfg.Size = New-Object System.Drawing.Size(490, 460)
+$pCoordCfg.Size = New-Object System.Drawing.Size((S 490), (S 460))
 $pCoordCfg.BackColor = $C_BG
 
-$pCoordCfg.Controls.Add((New-StyledLabel -Text "Coordinator Configuration" -X 20 -Y 10 -Width 460 -Height 30 -Font $F_TITLE))
+$pCoordCfg.Controls.Add((New-StyledLabel -Text "Orchestrator Configuration" -X 20 -Y 10 -Width 460 -Height 30 -Font $F_TITLE))
+
+$yC = 46
 
 # Port
-$pCoordCfg.Controls.Add((New-StyledLabel -Text "Relay Port:" -X 20 -Y 50 -Width 120 -Height 22))
-$script:txtPort = New-StyledTextBox -X 150 -Y 48 -Width 80 -Text "7070"
+$pCoordCfg.Controls.Add((New-StyledLabel -Text "Relay Port:" -X 20 -Y $yC -Width 120 -Height 22))
+$script:txtPort = New-StyledTextBox -X 150 -Y ($yC - 2) -Width 80 -Text "7070"
 $pCoordCfg.Controls.Add($script:txtPort)
-$pCoordCfg.Controls.Add((New-StyledLabel -Text "(1024-65535)" -X 240 -Y 50 -Width 100 -Height 22 -Font $F_SMALL -Color $C_TEXTDIM))
+$pCoordCfg.Controls.Add((New-StyledLabel -Text "Port the relay listens on (1024-65535)" -X 240 -Y $yC -Width 250 -Height 22 -Font $F_SMALL -Color $C_TEXTDIM))
+$yC += 34
 
 # Shared Secret
-$pCoordCfg.Controls.Add((New-StyledLabel -Text "Shared Secret:" -X 20 -Y 82 -Width 120 -Height 22))
-$script:txtSecretCoord = New-StyledTextBox -X 150 -Y 80 -Width 220 -Text (New-SharedSecret)
+$pCoordCfg.Controls.Add((New-StyledLabel -Text "Shared Secret:" -X 20 -Y $yC -Width 120 -Height 22))
+$script:txtSecretCoord = New-StyledTextBox -X 150 -Y ($yC - 2) -Width 220 -Text (New-SharedSecret)
 $pCoordCfg.Controls.Add($script:txtSecretCoord)
 
-$btnGenSecret = New-StyledButton -Text "Generate" -X 376 -Y 78 -Width 70 -Height 26
+$btnGenSecret = New-StyledButton -Text "Generate" -X 376 -Y ($yC - 3) -Width 70 -Height 26
 $btnGenSecret.Font = $F_SMALL
 $btnGenSecret.Add_Click({ $script:txtSecretCoord.Text = New-SharedSecret })
 $pCoordCfg.Controls.Add($btnGenSecret)
 
-$btnCopySecret = New-StyledButton -Text "Copy" -X 450 -Y 78 -Width 40 -Height 26
+$btnCopySecret = New-StyledButton -Text "Copy" -X 450 -Y ($yC - 3) -Width 50 -Height 26
 $btnCopySecret.Font = $F_SMALL
 $btnCopySecret.Add_Click({
     [System.Windows.Forms.Clipboard]::SetText($script:txtSecretCoord.Text)
 })
 $pCoordCfg.Controls.Add($btnCopySecret)
+$yC += 22
+$pCoordCfg.Controls.Add((New-StyledLabel -Text "Auth token for API and agent connections. Agents must use the same secret." -X 150 -Y $yC -Width 340 -Height 18 -Font $F_SMALL -Color $C_TEXTDIM))
+$yC += 24
 
 # PIN
-$pCoordCfg.Controls.Add((New-StyledLabel -Text "PIN Code:" -X 20 -Y 114 -Width 120 -Height 22))
-$script:txtPinCode = New-StyledTextBox -X 150 -Y 112 -Width 100 -Text ""
+$pCoordCfg.Controls.Add((New-StyledLabel -Text "PIN Code:" -X 20 -Y $yC -Width 120 -Height 22))
+$script:txtPinCode = New-StyledTextBox -X 150 -Y ($yC - 2) -Width 100 -Text ""
 $pCoordCfg.Controls.Add($script:txtPinCode)
-$pCoordCfg.Controls.Add((New-StyledLabel -Text "(4-8 digits, leave blank to disable)" -X 258 -Y 114 -Width 220 -Height 22 -Font $F_SMALL -Color $C_TEXTDIM))
+$yC += 22
+$pCoordCfg.Controls.Add((New-StyledLabel -Text "Second factor for task submission. 4-8 digits, leave blank to disable." -X 150 -Y $yC -Width 340 -Height 18 -Font $F_SMALL -Color $C_TEXTDIM))
+$yC += 28
 
-# Checkboxes
-$script:cbDiscovery = New-StyledCheckBox -Text "Enable auto-discovery broadcasting" -X 20 -Y 148 -Checked $true
-$script:cbQueue = New-StyledCheckBox -Text "Enable task queue" -X 20 -Y 172 -Checked $true
-$script:cbKeepAwakeCoord = New-StyledCheckBox -Text "Enable sleep prevention" -X 20 -Y 196 -Checked $true
-$script:cbRateLimit = New-StyledCheckBox -Text "Enable rate limiting" -X 20 -Y 220 -Checked $true
+# Checkboxes with descriptions
+$script:cbDiscovery = New-StyledCheckBox -Text "Enable auto-discovery broadcasting" -X 20 -Y $yC -Checked $true
 $pCoordCfg.Controls.Add($script:cbDiscovery)
+$pCoordCfg.Controls.Add((New-StyledLabel -Text "Agents on your LAN find this relay automatically via UDP broadcast" -X 44 -Y ($yC + 20) -Width 440 -Height 16 -Font $F_SMALL -Color $C_TEXTDIM))
+$yC += 38
+
+$script:cbQueue = New-StyledCheckBox -Text "Enable task queue" -X 20 -Y $yC -Checked $true
 $pCoordCfg.Controls.Add($script:cbQueue)
+$pCoordCfg.Controls.Add((New-StyledLabel -Text "Queue tasks when all agents are busy instead of rejecting them" -X 44 -Y ($yC + 20) -Width 440 -Height 16 -Font $F_SMALL -Color $C_TEXTDIM))
+$yC += 38
+
+$script:cbKeepAwakeCoord = New-StyledCheckBox -Text "Enable sleep prevention" -X 20 -Y $yC -Checked $true
 $pCoordCfg.Controls.Add($script:cbKeepAwakeCoord)
+$pCoordCfg.Controls.Add((New-StyledLabel -Text "Prevent Windows from sleeping while the relay is running" -X 44 -Y ($yC + 20) -Width 440 -Height 16 -Font $F_SMALL -Color $C_TEXTDIM))
+$yC += 38
+
+$script:cbRateLimit = New-StyledCheckBox -Text "Enable rate limiting" -X 20 -Y $yC -Checked $true
 $pCoordCfg.Controls.Add($script:cbRateLimit)
+$pCoordCfg.Controls.Add((New-StyledLabel -Text "Limit task submissions to 10/min and 100/hour" -X 44 -Y ($yC + 20) -Width 440 -Height 16 -Font $F_SMALL -Color $C_TEXTDIM))
+$yC += 38
 
 # Load balancing
-$pCoordCfg.Controls.Add((New-StyledLabel -Text "Load Balancing:" -X 20 -Y 252 -Width 120 -Height 22))
-$script:cmbLB = New-StyledComboBox -X 150 -Y 250 -Width 180 -Items @("least-busy", "round-robin", "fastest", "random") -SelectedIndex 0
+$pCoordCfg.Controls.Add((New-StyledLabel -Text "Load Balancing:" -X 20 -Y $yC -Width 120 -Height 22))
+$script:cmbLB = New-StyledComboBox -X 150 -Y ($yC - 2) -Width 180 -Items @("least-busy", "round-robin", "fastest", "random") -SelectedIndex 0
 $pCoordCfg.Controls.Add($script:cmbLB)
+$pCoordCfg.Controls.Add((New-StyledLabel -Text "How tasks are distributed across idle agents" -X 340 -Y $yC -Width 150 -Height 32 -Font $F_SMALL -Color $C_TEXTDIM))
 
 $p2.Controls.Add($pCoordCfg)
 
 # --- Worker config panel ---
 $pWorkerCfg = New-Object System.Windows.Forms.Panel
 $pWorkerCfg.Location = New-Object System.Drawing.Point(0, 0)
-$pWorkerCfg.Size = New-Object System.Drawing.Size(490, 460)
+$pWorkerCfg.Size = New-Object System.Drawing.Size((S 490), (S 460))
 $pWorkerCfg.BackColor = $C_BG
 $pWorkerCfg.Visible = $false
 
@@ -594,15 +653,15 @@ $p3.Controls.Add($script:cbEnableTLS)
 
 # TLS options panel (hidden by default)
 $pTlsOptions = New-Object System.Windows.Forms.Panel
-$pTlsOptions.Location = New-Object System.Drawing.Point(20, 120)
-$pTlsOptions.Size = New-Object System.Drawing.Size(460, 320)
+$pTlsOptions.Location = New-Object System.Drawing.Point((S 20), (S 120))
+$pTlsOptions.Size = New-Object System.Drawing.Size((S 460), (S 320))
 $pTlsOptions.BackColor = $C_BG
 $pTlsOptions.Visible = $false
 
 $script:rbSelfSigned = New-Object System.Windows.Forms.RadioButton
 $script:rbSelfSigned.Text = "Generate self-signed certificates"
-$script:rbSelfSigned.Location = New-Object System.Drawing.Point(10, 10)
-$script:rbSelfSigned.Size = New-Object System.Drawing.Size(400, 22)
+$script:rbSelfSigned.Location = New-Object System.Drawing.Point((S 10), (S 10))
+$script:rbSelfSigned.Size = New-Object System.Drawing.Size((S 400), (S 22))
 $script:rbSelfSigned.Font = $F_NORMAL
 $script:rbSelfSigned.ForeColor = $C_TEXT
 $script:rbSelfSigned.BackColor = [System.Drawing.Color]::Transparent
@@ -614,8 +673,8 @@ $pTlsOptions.Controls.Add((New-StyledLabel -Text "Certificates will be generated
 
 $script:rbExistingCerts = New-Object System.Windows.Forms.RadioButton
 $script:rbExistingCerts.Text = "Use existing certificates"
-$script:rbExistingCerts.Location = New-Object System.Drawing.Point(10, 68)
-$script:rbExistingCerts.Size = New-Object System.Drawing.Size(400, 22)
+$script:rbExistingCerts.Location = New-Object System.Drawing.Point((S 10), (S 68))
+$script:rbExistingCerts.Size = New-Object System.Drawing.Size((S 400), (S 22))
 $script:rbExistingCerts.Font = $F_NORMAL
 $script:rbExistingCerts.ForeColor = $C_TEXT
 $script:rbExistingCerts.BackColor = [System.Drawing.Color]::Transparent
@@ -623,8 +682,8 @@ $pTlsOptions.Controls.Add($script:rbExistingCerts)
 
 # Existing cert fields panel
 $pCertFields = New-Object System.Windows.Forms.Panel
-$pCertFields.Location = New-Object System.Drawing.Point(10, 96)
-$pCertFields.Size = New-Object System.Drawing.Size(440, 130)
+$pCertFields.Location = New-Object System.Drawing.Point((S 10), (S 96))
+$pCertFields.Size = New-Object System.Drawing.Size((S 440), (S 130))
 $pCertFields.BackColor = $C_BG
 $pCertFields.Visible = $false
 
@@ -686,8 +745,8 @@ $p4.Controls.Add($script:cbInstallService)
 
 # Service options
 $pSvcOptions = New-Object System.Windows.Forms.Panel
-$pSvcOptions.Location = New-Object System.Drawing.Point(20, 124)
-$pSvcOptions.Size = New-Object System.Drawing.Size(460, 180)
+$pSvcOptions.Location = New-Object System.Drawing.Point((S 20), (S 124))
+$pSvcOptions.Size = New-Object System.Drawing.Size((S 460), (S 180))
 $pSvcOptions.BackColor = $C_BG
 $pSvcOptions.Visible = $false
 
@@ -739,8 +798,8 @@ $script:txtReview.Multiline = $true
 $script:txtReview.ReadOnly = $true
 $script:txtReview.ScrollBars = "Both"
 $script:txtReview.WordWrap = $false
-$script:txtReview.Location = New-Object System.Drawing.Point(20, 82)
-$script:txtReview.Size = New-Object System.Drawing.Size(460, 370)
+$script:txtReview.Location = New-Object System.Drawing.Point((S 20), (S 82))
+$script:txtReview.Size = New-Object System.Drawing.Size((S 460), (S 370))
 $script:txtReview.Font = $F_MONO
 $script:txtReview.BackColor = $C_PANEL
 $script:txtReview.ForeColor = $C_TEXT
@@ -759,8 +818,8 @@ $p6.BackColor = $C_BG
 $p6.Controls.Add((New-StyledLabel -Text "Installing..." -X 20 -Y 18 -Width 460 -Height 32 -Font $F_TITLE))
 
 $script:progressBar = New-Object System.Windows.Forms.ProgressBar
-$script:progressBar.Location = New-Object System.Drawing.Point(20, 60)
-$script:progressBar.Size = New-Object System.Drawing.Size(460, 24)
+$script:progressBar.Location = New-Object System.Drawing.Point((S 20), (S 60))
+$script:progressBar.Size = New-Object System.Drawing.Size((S 460), (S 24))
 $script:progressBar.Style = "Continuous"
 $script:progressBar.Minimum = 0
 $script:progressBar.Maximum = 100
@@ -770,8 +829,8 @@ $script:txtInstallLog = New-Object System.Windows.Forms.TextBox
 $script:txtInstallLog.Multiline = $true
 $script:txtInstallLog.ReadOnly = $true
 $script:txtInstallLog.ScrollBars = "Vertical"
-$script:txtInstallLog.Location = New-Object System.Drawing.Point(20, 94)
-$script:txtInstallLog.Size = New-Object System.Drawing.Size(460, 356)
+$script:txtInstallLog.Location = New-Object System.Drawing.Point((S 20), (S 94))
+$script:txtInstallLog.Size = New-Object System.Drawing.Size((S 460), (S 356))
 $script:txtInstallLog.Font = $F_MONO
 $script:txtInstallLog.BackColor = $C_PANEL
 $script:txtInstallLog.ForeColor = $C_TEXT
@@ -864,14 +923,14 @@ function Show-Step {
     Update-Sidebar
 
     # Button visibility
-    $btnBack.Visible = ($StepIndex -gt 0 -and $StepIndex -lt 6)
-    $btnCancel.Visible = ($StepIndex -lt 6)
+    $btnBack.Visible = ($StepIndex -gt 0 -and $StepIndex -lt 5)
+    $btnCancel.Visible = ($StepIndex -lt 5)
 
     # Next button text
     switch ($StepIndex) {
-        5 { $btnNext.Text = "Install"; $btnNext.BackColor = $C_HIGHLIGHT; $btnNext.Visible = $true }
-        6 { $btnNext.Visible = $false; $btnBack.Visible = $false; $btnCancel.Visible = $false }
-        7 { $btnNext.Text = "Finish"; $btnNext.BackColor = $C_HIGHLIGHT; $btnNext.Visible = $true; $btnBack.Visible = $false; $btnCancel.Visible = $false }
+        4 { $btnNext.Text = "Install"; $btnNext.BackColor = $C_HIGHLIGHT; $btnNext.Visible = $true }
+        5 { $btnNext.Visible = $false; $btnBack.Visible = $false; $btnCancel.Visible = $false }
+        6 { $btnNext.Text = "Finish"; $btnNext.BackColor = $C_HIGHLIGHT; $btnNext.Visible = $true; $btnBack.Visible = $false; $btnCancel.Visible = $false }
         default { $btnNext.Text = "Next >"; $btnNext.BackColor = $C_ACCENT; $btnNext.Visible = $true }
     }
 }
@@ -882,12 +941,12 @@ function Build-ReviewText {
 
     [void]$sb.AppendLine("=== DISPATCH ORCHESTRATOR SETUP REVIEW ===")
     [void]$sb.AppendLine("")
-    [void]$sb.AppendLine("Role:          $($role.ToUpper())")
+    [void]$sb.AppendLine("Role:          ORCHESTRATOR")
     [void]$sb.AppendLine("Project Root:  $ProjectRoot")
     [void]$sb.AppendLine("")
 
     if ($role -eq "coordinator") {
-        [void]$sb.AppendLine("--- Coordinator Settings ---")
+        [void]$sb.AppendLine("--- Orchestrator Settings ---")
         [void]$sb.AppendLine("Port:              $($script:txtPort.Text)")
         [void]$sb.AppendLine("Shared Secret:     $($script:txtSecretCoord.Text.Substring(0, [Math]::Min(16, $script:txtSecretCoord.Text.Length)))...")
         $pinDisplay = if ($script:txtPinCode.Text.Length -gt 0) { $script:txtPinCode.Text } else { "(disabled)" }
@@ -1106,14 +1165,15 @@ function Run-Installation {
     $totalSteps = 5
     if ($script:cbEnableTLS.Checked -and $script:rbSelfSigned.Checked) { $totalSteps++ }
     if ($script:cbInstallService.Checked) { $totalSteps++ }
-    $stepNum = 0
+    $script:_installStepNum = 0
+    $script:_installTotalSteps = $totalSteps
 
     $advanceProgress = {
-        $stepNum++
-        $pct = [Math]::Min(100, [int](($stepNum / $totalSteps) * 100))
+        $script:_installStepNum++
+        $pct = [Math]::Min(100, [int](($script:_installStepNum / $script:_installTotalSteps) * 100))
         $script:progressBar.Value = $pct
         [System.Windows.Forms.Application]::DoEvents()
-    }.GetNewClosure()
+    }
 
     # --- Step: Check Node.js ---
     Write-InstallLog "Checking Node.js..." "INFO"
@@ -1151,15 +1211,28 @@ function Run-Installation {
     # --- Step: Write config ---
     $configJson = Build-ConfigJson
     if ($role -eq "coordinator") {
-        $configPath = Join-Path $ProjectRoot "relay" "config.json"
+        $configPath = Join-Path (Join-Path $ProjectRoot "relay") "config.json"
         Write-InstallLog "Writing relay/config.json..." "INFO"
     } else {
-        $configPath = Join-Path $ProjectRoot "worker" "worker-config.json"
+        $configPath = Join-Path (Join-Path $ProjectRoot "worker") "worker-config.json"
         Write-InstallLog "Writing worker/worker-config.json..." "INFO"
     }
     try {
         $configJson | Set-Content -Path $configPath -Encoding UTF8 -Force
         Write-InstallLog "Configuration written to $configPath" "OK"
+    } catch [System.UnauthorizedAccessException] {
+        # Program Files requires elevation — use a temp file + elevated copy
+        Write-InstallLog "Elevation required for $configPath — requesting admin..." "INFO"
+        try {
+            $tmpFile = [System.IO.Path]::GetTempFileName()
+            $configJson | Set-Content -Path $tmpFile -Encoding UTF8 -Force
+            $copyCmd = "Copy-Item -Path '$tmpFile' -Destination '$configPath' -Force; Remove-Item '$tmpFile' -Force"
+            Start-Process powershell -ArgumentList "-NoProfile -Command `"$copyCmd`"" -Verb RunAs -Wait
+            Write-InstallLog "Configuration written to $configPath (elevated)" "OK"
+        } catch {
+            Write-InstallLog "Failed to write config even with elevation: $_" "FAIL"
+            return $false
+        }
     } catch {
         Write-InstallLog "Failed to write config: $_" "FAIL"
         return $false
@@ -1170,7 +1243,7 @@ function Run-Installation {
     if ($script:cbEnableTLS.Checked -and $script:rbSelfSigned.Checked) {
         Write-InstallLog "Generating TLS certificates..." "INFO"
         [System.Windows.Forms.Application]::DoEvents()
-        $certScript = Join-Path $ProjectRoot "install" "generate-certs.ps1"
+        $certScript = Join-Path (Join-Path $ProjectRoot "install") "generate-certs.ps1"
         if (Test-Path $certScript) {
             try {
                 $certOutput = & powershell -ExecutionPolicy Bypass -File $certScript -Force 2>&1 | Out-String
@@ -1223,10 +1296,10 @@ function Run-Installation {
             try {
                 $nodePath = (Get-Command node.exe).Source
                 if ($role -eq "coordinator") {
-                    $entryScript = Join-Path $ProjectRoot "relay" "server.js"
+                    $entryScript = Join-Path (Join-Path $ProjectRoot "relay") "server.js"
                     $appDir = Join-Path $ProjectRoot "relay"
                 } else {
-                    $entryScript = Join-Path $ProjectRoot "worker" "agent-relay.js"
+                    $entryScript = Join-Path (Join-Path $ProjectRoot "worker") "agent-relay.js"
                     $appDir = Join-Path $ProjectRoot "worker"
                 }
                 $logsDir = Join-Path $ProjectRoot "logs"
@@ -1277,15 +1350,15 @@ function Run-Installation {
         try {
             $nodePath = (Get-Command node.exe).Source
             if ($role -eq "coordinator") {
-                $entryScript = Join-Path $ProjectRoot "relay" "server.js"
+                $entryScript = Join-Path (Join-Path $ProjectRoot "relay") "server.js"
             } else {
-                $entryScript = Join-Path $ProjectRoot "worker" "agent-relay.js"
+                $entryScript = Join-Path (Join-Path $ProjectRoot "worker") "agent-relay.js"
             }
 
             # Use AppData for logs when installed to a protected directory (Program Files)
             $normalizedRoot = $ProjectRoot.Replace('\', '/').ToLower()
             if ($normalizedRoot -match 'program files' -and $env:APPDATA) {
-                $logsDir = Join-Path $env:APPDATA "DispatchOrchestrator" "logs"
+                $logsDir = Join-Path (Join-Path $env:APPDATA "DispatchOrchestrator") "logs"
             } else {
                 $logsDir = Join-Path $ProjectRoot "logs"
             }
@@ -1343,61 +1416,33 @@ cd /d "$ProjectRoot"
 function Validate-Step {
     param([int]$StepIndex)
     switch ($StepIndex) {
+        0 {
+            # Welcome — set up coordinator config panel visibility
+            $pCoordCfg.Visible = $true
+            $pWorkerCfg.Visible = $false
+            $script:txtServiceName.Text = "DispatchRelay"
+            return $true
+        }
         1 {
-            # Role selection
-            if (-not $script:rbCoord.Checked -and -not $script:rbWorker.Checked) {
-                [System.Windows.Forms.MessageBox]::Show("Please select a role (Coordinator or Worker).", "Validation", "OK", "Warning")
+            # Configuration validation (coordinator)
+            $port = 0
+            if (-not [int]::TryParse($script:txtPort.Text, [ref]$port) -or $port -lt 1024 -or $port -gt 65535) {
+                [System.Windows.Forms.MessageBox]::Show("Port must be a number between 1024 and 65535.", "Validation", "OK", "Warning")
                 return $false
             }
-            $script:SelectedRole = if ($script:rbCoord.Checked) { "coordinator" } else { "worker" }
-
-            # Update dynamic config panel
-            $pCoordCfg.Visible = ($script:SelectedRole -eq "coordinator")
-            $pWorkerCfg.Visible = ($script:SelectedRole -eq "worker")
-
-            # Update service name default
-            $script:txtServiceName.Text = if ($script:SelectedRole -eq "coordinator") { "DispatchRelay" } else { "DispatchWorker" }
+            if ($script:txtSecretCoord.Text.Trim().Length -lt 8) {
+                [System.Windows.Forms.MessageBox]::Show("Shared secret must be at least 8 characters.", "Validation", "OK", "Warning")
+                return $false
+            }
+            if ($script:txtPinCode.Text.Length -gt 0) {
+                if ($script:txtPinCode.Text -notmatch '^\d{4,8}$') {
+                    [System.Windows.Forms.MessageBox]::Show("PIN must be 4-8 digits (or leave blank to disable).", "Validation", "OK", "Warning")
+                    return $false
+                }
+            }
             return $true
         }
         2 {
-            # Configuration validation
-            if ($script:SelectedRole -eq "coordinator") {
-                $port = 0
-                if (-not [int]::TryParse($script:txtPort.Text, [ref]$port) -or $port -lt 1024 -or $port -gt 65535) {
-                    [System.Windows.Forms.MessageBox]::Show("Port must be a number between 1024 and 65535.", "Validation", "OK", "Warning")
-                    return $false
-                }
-                if ($script:txtSecretCoord.Text.Trim().Length -lt 8) {
-                    [System.Windows.Forms.MessageBox]::Show("Shared secret must be at least 8 characters.", "Validation", "OK", "Warning")
-                    return $false
-                }
-                if ($script:txtPinCode.Text.Length -gt 0) {
-                    if ($script:txtPinCode.Text -notmatch '^\d{4,8}$') {
-                        [System.Windows.Forms.MessageBox]::Show("PIN must be 4-8 digits (or leave blank to disable).", "Validation", "OK", "Warning")
-                        return $false
-                    }
-                }
-            } else {
-                if ($script:txtAgentName.Text.Trim().Length -eq 0) {
-                    [System.Windows.Forms.MessageBox]::Show("Agent name is required.", "Validation", "OK", "Warning")
-                    return $false
-                }
-                if ($script:txtSecretWorker.Text.Trim().Length -lt 8) {
-                    [System.Windows.Forms.MessageBox]::Show("Shared secret must be at least 8 characters.`nIt must match the coordinator's secret.", "Validation", "OK", "Warning")
-                    return $false
-                }
-                if ($script:txtWorkDir.Text.Trim().Length -eq 0) {
-                    [System.Windows.Forms.MessageBox]::Show("Default working directory is required.", "Validation", "OK", "Warning")
-                    return $false
-                }
-                if ($script:txtMachineId.Text.Trim().Length -eq 0) {
-                    [System.Windows.Forms.MessageBox]::Show("Machine ID is required.", "Validation", "OK", "Warning")
-                    return $false
-                }
-            }
-            return $true
-        }
-        3 {
             # TLS validation
             if ($script:cbEnableTLS.Checked -and $script:rbExistingCerts.Checked) {
                 if ($script:txtCertFile.Text.Trim().Length -eq 0 -or
@@ -1409,7 +1454,7 @@ function Validate-Step {
             }
             return $true
         }
-        4 {
+        3 {
             # Service validation
             if ($script:cbInstallService.Checked -and $script:txtServiceName.Text.Trim().Length -eq 0) {
                 [System.Windows.Forms.MessageBox]::Show("Service name is required.", "Validation", "OK", "Warning")
@@ -1431,9 +1476,9 @@ $btnNext.Add_Click({
     # Validate current step before proceeding
     if (-not (Validate-Step $step)) { return }
 
-    if ($step -eq 5) {
-        # Install step
-        Show-Step 6
+    if ($step -eq 4) {
+        # Install step (Review -> Installing)
+        Show-Step 5
         [System.Windows.Forms.Application]::DoEvents()
         $success = Run-Installation
         if ($success) {
@@ -1449,12 +1494,12 @@ $btnNext.Add_Click({
                 $secret = $script:txtSecretCoord.Text
                 $secretHint = $secret.Substring(0, [Math]::Min(4, $secret.Length)) + "...." + $secret.Substring([Math]::Max(0, $secret.Length - 4))
                 $svcInstalled = $script:cbInstallService.Checked
-                $script:lblCompleteSummary.Text = "Your machine has been configured as a Coordinator.`nThe relay server is configured on port $port.`nShared secret has been set in relay/config.json."
+                $script:lblCompleteSummary.Text = "Your machine has been configured as the Orchestrator.`nThe relay server is configured on port $port.`nShared secret has been set in relay/config.json."
                 if ($svcInstalled) {
                     $script:lblWhatsNext.Text = "What's next:`n`n" +
                         "  - The relay is running as a Windows service (starts on boot)`n" +
                         "  - Open the dashboard at $proto`://localhost:$port/dashboard`n" +
-                        "  - Run workers on other machines and point them to this coordinator`n`n" +
+                        "  - Install agents on other machines and point them to this orchestrator`n`n" +
                         "DASHBOARD SETUP:`n" +
                         "  When prompted, enter your shared secret as the Bearer token.`n" +
                         "  Your shared secret is: $secretHint"
@@ -1462,7 +1507,7 @@ $btnNext.Add_Click({
                     $script:lblWhatsNext.Text = "What's next:`n`n" +
                         "  - The relay has been started in the background`n" +
                         "  - Open the dashboard at $proto`://localhost:$port/dashboard`n" +
-                        "  - Run workers on other machines and point them to this coordinator`n" +
+                        "  - Install agents on other machines and point them to this orchestrator`n" +
                         "  - To restart later: npm run relay`n`n" +
                         "DASHBOARD SETUP:`n" +
                         "  When prompted, enter your shared secret as the Bearer token.`n" +
@@ -1497,7 +1542,7 @@ $btnNext.Add_Click({
                 }
             }
 
-            Show-Step 7
+            Show-Step 6
         } else {
             # Stay on install page, user can see errors
             $btnNext.Visible = $true
@@ -1508,14 +1553,14 @@ $btnNext.Add_Click({
         return
     }
 
-    if ($step -eq 7) {
+    if ($step -eq 6) {
         # Finish
         $form.Close()
         return
     }
 
-    # Populate review on step 5
-    if ($step -eq 4) {
+    # Populate review before showing Review step
+    if ($step -eq 3) {
         $script:txtReview.Text = Build-ReviewText
     }
 
@@ -1555,3 +1600,10 @@ $form.Add_Shown({
 
 # Cleanup
 $form.Dispose()
+
+# Exit with code 0 on success, 1 on cancel
+if ($script:InstallCancelled) {
+    exit 1
+} else {
+    exit 0
+}
