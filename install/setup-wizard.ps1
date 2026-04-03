@@ -381,39 +381,42 @@ if (Test-Path $diagramPath) {
 }
 
 $p0.Controls.Add((New-StyledLabel -Text "This wizard will configure this machine as the Orchestrator." `
-    -X 20 -Y 368 -Width 470 -Height 24 -Font $F_NORMAL))
+    -X 20 -Y 366 -Width 470 -Height 22 -Font $F_NORMAL))
 
-# Setup mode selection -- group container to isolate radio buttons
-$modeGroup = New-Object System.Windows.Forms.GroupBox
-$modeGroup.Location = New-Object System.Drawing.Point((S 20), (S 394))
-$modeGroup.Size = New-Object System.Drawing.Size((S 460), (S 50))
-$modeGroup.FlatStyle = "Flat"
-$modeGroup.ForeColor = $C_BG
-$modeGroup.BackColor = [System.Drawing.Color]::Transparent
-$modeGroup.Text = ""
-$p0.Controls.Add($modeGroup)
+# Setup mode selection — use a Panel (not GroupBox) for clean look
+$modePanel = New-Object System.Windows.Forms.Panel
+$modePanel.Location = New-Object System.Drawing.Point((S 20), (S 394))
+$modePanel.Size = New-Object System.Drawing.Size((S 460), (S 46))
+$modePanel.BackColor = [System.Drawing.Color]::Transparent
+$p0.Controls.Add($modePanel)
 
 $script:radioBasicMode = New-Object System.Windows.Forms.RadioButton
 $script:radioBasicMode.Text = "Basic Setup (recommended)"
-$script:radioBasicMode.Location = New-Object System.Drawing.Point((S 0), (S 0))
-$script:radioBasicMode.Size = New-Object System.Drawing.Size((S 210), (S 22))
+$script:radioBasicMode.Location = New-Object System.Drawing.Point(0, 0)
+$script:radioBasicMode.Size = New-Object System.Drawing.Size((S 230), (S 20))
 $script:radioBasicMode.Font = $F_NORMAL
 $script:radioBasicMode.ForeColor = $C_TEXT
 $script:radioBasicMode.BackColor = [System.Drawing.Color]::Transparent
 $script:radioBasicMode.Checked = $true
-$modeGroup.Controls.Add($script:radioBasicMode)
+$modePanel.Controls.Add($script:radioBasicMode)
 
 $script:radioAdvancedMode = New-Object System.Windows.Forms.RadioButton
 $script:radioAdvancedMode.Text = "Advanced Setup"
-$script:radioAdvancedMode.Location = New-Object System.Drawing.Point((S 220), (S 0))
-$script:radioAdvancedMode.Size = New-Object System.Drawing.Size((S 200), (S 22))
+$script:radioAdvancedMode.Location = New-Object System.Drawing.Point((S 240), 0)
+$script:radioAdvancedMode.Size = New-Object System.Drawing.Size((S 200), (S 20))
 $script:radioAdvancedMode.Font = $F_NORMAL
 $script:radioAdvancedMode.ForeColor = $C_TEXT
 $script:radioAdvancedMode.BackColor = [System.Drawing.Color]::Transparent
-$modeGroup.Controls.Add($script:radioAdvancedMode)
+$modePanel.Controls.Add($script:radioAdvancedMode)
 
-$script:lblModeDesc = New-StyledLabel -Text "Quick setup -- port, shared secret, and PIN. Uses sensible defaults." -X 0 -Y 24 -Width 450 -Height 18 -Font $F_SMALL -Color $C_TEXTDIM
-$modeGroup.Controls.Add($script:lblModeDesc)
+$script:lblModeDesc = New-Object System.Windows.Forms.Label
+$script:lblModeDesc.Text = "Quick setup -- port, shared secret, and PIN. Uses sensible defaults."
+$script:lblModeDesc.Location = New-Object System.Drawing.Point(0, (S 22))
+$script:lblModeDesc.Size = New-Object System.Drawing.Size((S 450), (S 18))
+$script:lblModeDesc.Font = $F_SMALL
+$script:lblModeDesc.ForeColor = $C_TEXTDIM
+$script:lblModeDesc.BackColor = [System.Drawing.Color]::Transparent
+$modePanel.Controls.Add($script:lblModeDesc)
 
 $script:radioBasicMode.Add_CheckedChanged({
     if ($script:radioBasicMode.Checked) {
@@ -430,7 +433,7 @@ $script:radioAdvancedMode.Add_CheckedChanged({
     }
 })
 
-$p0.Controls.Add((New-StyledLabel -Text "Project root: $ProjectRoot" -X 20 -Y 446 -Width 460 -Height 20 -Font $F_SMALL -Color $C_TEXTDIM))
+$p0.Controls.Add((New-StyledLabel -Text "Project root: $ProjectRoot" -X 20 -Y 444 -Width 460 -Height 20 -Font $F_SMALL -Color $C_TEXTDIM))
 $panels[0] = $p0
 
 # ---------------------------------------------------------------------------
