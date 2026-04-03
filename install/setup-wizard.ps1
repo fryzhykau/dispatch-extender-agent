@@ -1557,7 +1557,17 @@ $btnNext.Add_Click({
         if ($script:cbStartRelay -and $script:cbStartRelay.Checked) {
             $port = if ($script:SelectedRole -eq "coordinator") { $script:txtPort.Text } else { "7070" }
             $proto = if ($script:cbEnableTLS.Checked) { "https" } else { "http" }
-            $cmdArgs = "/K title Dispatch Relay & node relay/server.js"
+
+            # Kill any existing process on the relay port
+            try {
+                $existing = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($existing) {
+                    Stop-Process -Id $existing.OwningProcess -Force -ErrorAction SilentlyContinue
+                    Start-Sleep -Milliseconds 500
+                }
+            } catch {}
+
+            $cmdArgs = "/C title Dispatch Relay & node relay/server.js || (echo. & echo Relay stopped. Press any key to close. & pause >nul)"
             Start-Process cmd.exe -ArgumentList $cmdArgs -WorkingDirectory $ProjectRoot -WindowStyle Minimized
             Start-Sleep -Seconds 3
             # Pass the shared secret as a URL param so the dashboard auto-configures
