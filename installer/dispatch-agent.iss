@@ -136,9 +136,9 @@ Name: "desktopicon"; Description: "Create &desktop shortcuts (Start Agent, Agent
 ; --------------------------------------------------------------------------
 [Run]
 ; Install npm dependencies (production only)
-Filename: "cmd.exe"; Parameters: "/C echo Installing dependencies... && npm install --production && echo Done! && timeout /T 2 >nul"; \
+Filename: "cmd.exe"; Parameters: "/C echo Installing dependencies... && npm install --production >nul 2>&1 && echo Done! || echo Failed! & exit"; \
   WorkingDir: "{app}"; StatusMsg: "Installing Node.js dependencies..."; \
-  Flags: runminimized waituntilterminated; Check: NodeJsInstalled
+  Flags: runhidden waituntilterminated; Check: NodeJsInstalled
 
 ; Launch the agent setup wizard after installation completes
 Filename: "powershell.exe"; \

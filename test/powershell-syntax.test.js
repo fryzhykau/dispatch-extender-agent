@@ -277,4 +277,28 @@ describe('JavaScript security checks', () => {
     assert.ok(content.includes('replaceState'),
       'Dashboard should strip token from URL after importing');
   });
+
+  it('relay heartbeat should use INTERVAL + TIMEOUT threshold (not just TIMEOUT)', () => {
+    const content = readFileSync(join(projectRoot, 'relay', 'server.js'), 'utf-8');
+    assert.ok(content.includes('HEARTBEAT_INTERVAL + HEARTBEAT_TIMEOUT'),
+      'Heartbeat check must use interval + timeout to avoid disconnecting workers on first ping cycle');
+  });
+
+  it('relay should handle EADDRINUSE with a user-friendly error', () => {
+    const content = readFileSync(join(projectRoot, 'relay', 'server.js'), 'utf-8');
+    assert.ok(content.includes('EADDRINUSE'), 'Relay should handle EADDRINUSE error');
+    assert.ok(content.includes('already in use'), 'Relay should show user-friendly port-in-use message');
+  });
+
+  it('worker should log WebSocket close code and reason', () => {
+    const content = readFileSync(join(projectRoot, 'worker', 'agent-relay.js'), 'utf-8');
+    assert.ok(content.includes('code') && content.includes('reason'),
+      'Worker should log close code and reason for disconnect diagnostics');
+  });
+
+  it('agent wizard should have elevated config write fallback', () => {
+    const content = readFileSync(join(projectRoot, 'installer', 'agent-setup-wizard.ps1'), 'utf-8');
+    assert.ok(content.includes('Verb RunAs'),
+      'Agent wizard should fall back to elevated write for Program Files');
+  });
 });
