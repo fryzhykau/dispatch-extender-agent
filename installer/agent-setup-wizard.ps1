@@ -130,7 +130,7 @@ $script:Config = @{
 # ---------------------------------------------------------------------------
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Dispatch Agent Setup"
-$form.Size = New-Object System.Drawing.Size((S 716), (S 520))
+$form.Size = New-Object System.Drawing.Size((S 716), (S 558))
 $form.StartPosition = "CenterScreen"
 $form.FormBorderStyle = "FixedSingle"
 $form.MaximizeBox = $false
@@ -267,7 +267,7 @@ function New-StyledRadio {
 # ---------------------------------------------------------------------------
 $sidebar = New-Object System.Windows.Forms.Panel
 $sidebar.Location = New-Object System.Drawing.Point(0, 0)
-$sidebar.Size = New-Object System.Drawing.Size((S 190), (S 520))
+$sidebar.Size = New-Object System.Drawing.Size((S 190), (S 558))
 $sidebar.BackColor = $ColorPanel
 
 $sideTitle = New-StyledLabel -Parent $sidebar -Text "Setup Steps" -X 14 -Y 14 -Width 170 -Height 28 -Font $FontLabel -ForeColor $ColorHighlight
@@ -302,7 +302,7 @@ $form.Controls.Add($sidebar)
 # ---------------------------------------------------------------------------
 $contentPanel = New-Object System.Windows.Forms.Panel
 $contentPanel.Location = New-Object System.Drawing.Point((S 190), 0)
-$contentPanel.Size = New-Object System.Drawing.Size((S 490), (S 420))
+$contentPanel.Size = New-Object System.Drawing.Size((S 510), (S 470))
 $contentPanel.BackColor = $ColorDarkBg
 $form.Controls.Add($contentPanel)
 
@@ -310,8 +310,8 @@ $form.Controls.Add($contentPanel)
 # Bottom bar — navigation buttons
 # ---------------------------------------------------------------------------
 $bottomBar = New-Object System.Windows.Forms.Panel
-$bottomBar.Location = New-Object System.Drawing.Point((S 190), (S 420))
-$bottomBar.Size = New-Object System.Drawing.Size((S 490), (S 50))
+$bottomBar.Location = New-Object System.Drawing.Point((S 190), (S 470))
+$bottomBar.Size = New-Object System.Drawing.Size((S 510), (S 50))
 $bottomBar.BackColor = $ColorPanel
 $form.Controls.Add($bottomBar)
 
@@ -343,7 +343,7 @@ if (-not (Test-Path $diagramPath)) {
 if (Test-Path $diagramPath) {
     # Pre-scale the diagram with high-quality bicubic to avoid PictureBox pixelation
     $diagramSrc = [System.Drawing.Image]::FromFile($diagramPath)
-    $dw = S 340; $dh = S 200
+    $dw = S 400; $dh = S 180
     $diagramScaled = New-Object System.Drawing.Bitmap($dw, $dh, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
     $dg = [System.Drawing.Graphics]::FromImage($diagramScaled)
     $dg.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
@@ -363,7 +363,7 @@ if (Test-Path $diagramPath) {
     $diagramSrc.Dispose()
 
     $diagramPic = New-Object System.Windows.Forms.PictureBox
-    $diagramPic.Location = New-Object System.Drawing.Point((S 60), (S 106))
+    $diagramPic.Location = New-Object System.Drawing.Point((S 40), (S 104))
     $diagramPic.Size = New-Object System.Drawing.Size($dw, $dh)  # already scaled
     $diagramPic.SizeMode = "CenterImage"
     $diagramPic.BackColor = [System.Drawing.Color]::Transparent
@@ -371,12 +371,12 @@ if (Test-Path $diagramPath) {
     $p0.Controls.Add($diagramPic)
 }
 
-New-StyledLabel -Parent $p0 -Text "Agents receive tasks from the orchestrator and run them`nusing Claude Code." -X 20 -Y 318 -Width 450 -Height 36 -Font $FontBody -ForeColor $ColorLightGray | Out-Null
+New-StyledLabel -Parent $p0 -Text "Agents receive tasks from the orchestrator and run them using Claude Code." -X 20 -Y 296 -Width 460 -Height 22 -Font $FontBody -ForeColor $ColorLightGray | Out-Null
 
-# Setup mode selection — use Panel (not GroupBox) for clean look
+# Setup mode selection
 $modePanel = New-Object System.Windows.Forms.Panel
-$modePanel.Location = New-Object System.Drawing.Point((S 20), (S 354))
-$modePanel.Size = New-Object System.Drawing.Size((S 440), (S 46))
+$modePanel.Location = New-Object System.Drawing.Point((S 20), (S 330))
+$modePanel.Size = New-Object System.Drawing.Size((S 460), (S 46))
 $modePanel.BackColor = [System.Drawing.Color]::Transparent
 $p0.Controls.Add($modePanel)
 
@@ -400,7 +400,8 @@ $script:radioAdvancedMode.Add_CheckedChanged({
     }
 })
 
-New-StyledLabel -Parent $p0 -Text "Project root: $ProjectRoot" -X 20 -Y 408 -Width 450 -Height 20 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+New-StyledLabel -Parent $p0 -Text "Click Next to begin." -X 20 -Y 388 -Width 460 -Height 20 -Font $FontBody -ForeColor $ColorDimGray | Out-Null
+New-StyledLabel -Parent $p0 -Text "Project root: $ProjectRoot" -X 20 -Y 430 -Width 460 -Height 20 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
 $panels[0] = $p0
 
