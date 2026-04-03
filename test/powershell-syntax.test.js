@@ -321,14 +321,36 @@ describe('JavaScript security checks', () => {
       'Worker should pass allowed directories via --add-dir');
   });
 
-  it('worker should prepend directory restrictions to prompts', () => {
+  it('worker should prepend directory restrictions with XML boundaries', () => {
     const content = readFileSync(join(projectRoot, 'worker', 'agent-relay.js'), 'utf-8');
-    assert.ok(content.includes('SECURITY RULES'),
-      'Worker should prepend security restriction rules to prompts');
-    assert.ok(content.includes('ONLY read, write, and execute within'),
-      'Worker should specify allowed directories in prompt');
-    assert.ok(content.includes('NEVER access'),
-      'Worker should specify denied directories in prompt');
+    assert.ok(content.includes('<system-security>'),
+      'Worker should use XML-style system-security delimiters');
+    assert.ok(content.includes('<user-task>'),
+      'Worker should wrap user prompt in user-task delimiters');
+    assert.ok(content.includes('IMMUTABLE'),
+      'Worker should declare rules as immutable');
+  });
+
+  it('worker should detect common prompt injection patterns', () => {
+    const content = readFileSync(join(projectRoot, 'worker', 'agent-relay.js'), 'utf-8');
+    assert.ok(content.includes('injectionPatterns'),
+      'Worker should have injection pattern detection');
+    assert.ok(content.includes('ignore') && content.includes('previous'),
+      'Worker should detect "ignore previous instructions" pattern');
+    assert.ok(content.includes('override') && content.includes('security'),
+      'Worker should detect "override security" pattern');
+  });
+
+  it('worker should sanitize control characters from prompts', () => {
+    const content = readFileSync(join(projectRoot, 'worker', 'agent-relay.js'), 'utf-8');
+    assert.ok(content.includes('sanitizedPrompt') && content.includes('\\x00'),
+      'Worker should strip control characters from prompts');
+  });
+
+  it('worker should audit output for restricted path access', () => {
+    const content = readFileSync(join(projectRoot, 'worker', 'agent-relay.js'), 'utf-8');
+    assert.ok(content.includes('Output audit') && content.includes('denied path'),
+      'Worker should check output for references to denied paths');
   });
 
   it('worker should support --config flag for multiple agents', () => {
