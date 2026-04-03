@@ -39,7 +39,7 @@ try {
         $msg = "ERROR: Setup wizard script not found at: $WizardScript"
         $msg | Out-File -FilePath $LogFile -Append -Encoding UTF8
         Add-Type -AssemblyName System.Windows.Forms
-        [System.Windows.Forms.MessageBox]::Show(
+        [void][System.Windows.Forms.MessageBox]::Show(
             "Setup wizard not found.`n`nExpected: $WizardScript`nSee log: $LogFile",
             "Dispatch Agent", 0, 48) | Out-Null
         exit 1
@@ -57,7 +57,7 @@ catch {
     $errMsg | Out-File -FilePath $LogFile -Append -Encoding UTF8
 
     Add-Type -AssemblyName System.Windows.Forms
-    [System.Windows.Forms.MessageBox]::Show(
+    [void][System.Windows.Forms.MessageBox]::Show(
         "Setup wizard failed to launch.`n`n$($_.Exception.Message)`n`nSee log: $LogFile",
         "Dispatch Agent", 0, 48) | Out-Null
     exit 1

@@ -1419,55 +1419,50 @@ function Run-Installation {
 
 function Validate-Step {
     param([int]$StepIndex)
-    switch ($StepIndex) {
-        0 {
-            # Welcome — set up coordinator config panel visibility
-            $pCoordCfg.Visible = $true
-            $pWorkerCfg.Visible = $false
-            $script:txtServiceName.Text = "DispatchRelay"
-            return $true
-        }
-        1 {
-            # Configuration validation (coordinator)
-            $port = 0
-            if (-not [int]::TryParse($script:txtPort.Text, [ref]$port) -or $port -lt 1024 -or $port -gt 65535) {
-                [System.Windows.Forms.MessageBox]::Show("Port must be a number between 1024 and 65535.", "Validation", "OK", "Warning")
-                return $false
-            }
-            if ($script:txtSecretCoord.Text.Trim().Length -lt 8) {
-                [System.Windows.Forms.MessageBox]::Show("Shared secret must be at least 8 characters.", "Validation", "OK", "Warning")
-                return $false
-            }
-            if ($script:txtPinCode.Text.Length -gt 0) {
-                if ($script:txtPinCode.Text -notmatch '^\d{4,8}$') {
-                    [System.Windows.Forms.MessageBox]::Show("PIN must be 4-8 digits (or leave blank to disable).", "Validation", "OK", "Warning")
-                    return $false
-                }
-            }
-            return $true
-        }
-        2 {
-            # TLS validation
-            if ($script:cbEnableTLS.Checked -and $script:rbExistingCerts.Checked) {
-                if ($script:txtCertFile.Text.Trim().Length -eq 0 -or
-                    $script:txtKeyFile.Text.Trim().Length -eq 0 -or
-                    $script:txtCaFile.Text.Trim().Length -eq 0) {
-                    [System.Windows.Forms.MessageBox]::Show("Please provide all three certificate files (cert, key, CA).", "Validation", "OK", "Warning")
-                    return $false
-                }
-            }
-            return $true
-        }
-        3 {
-            # Service validation
-            if ($script:cbInstallService.Checked -and $script:txtServiceName.Text.Trim().Length -eq 0) {
-                [System.Windows.Forms.MessageBox]::Show("Service name is required.", "Validation", "OK", "Warning")
-                return $false
-            }
-            return $true
-        }
-        default { return $true }
+
+    if ($StepIndex -eq 0) {
+        # Welcome — set up coordinator config panel visibility
+        $pCoordCfg.Visible = $true
+        $pWorkerCfg.Visible = $false
+        $script:txtServiceName.Text = "DispatchRelay"
     }
+    elseif ($StepIndex -eq 1) {
+        # Configuration validation (coordinator)
+        $port = 0
+        if (-not [int]::TryParse($script:txtPort.Text, [ref]$port) -or $port -lt 1024 -or $port -gt 65535) {
+            [void][System.Windows.Forms.MessageBox]::Show("Port must be a number between 1024 and 65535.", "Validation", "OK", "Warning")
+            return $false
+        }
+        if ($script:txtSecretCoord.Text.Trim().Length -lt 8) {
+            [void][System.Windows.Forms.MessageBox]::Show("Shared secret must be at least 8 characters.", "Validation", "OK", "Warning")
+            return $false
+        }
+        if ($script:txtPinCode.Text.Length -gt 0) {
+            if ($script:txtPinCode.Text -notmatch '^\d{4,8}$') {
+                [void][System.Windows.Forms.MessageBox]::Show("PIN must be 4-8 digits (or leave blank to disable).", "Validation", "OK", "Warning")
+                return $false
+            }
+        }
+    }
+    elseif ($StepIndex -eq 2) {
+        # TLS validation
+        if ($script:cbEnableTLS.Checked -and $script:rbExistingCerts.Checked) {
+            if ($script:txtCertFile.Text.Trim().Length -eq 0 -or
+                $script:txtKeyFile.Text.Trim().Length -eq 0 -or
+                $script:txtCaFile.Text.Trim().Length -eq 0) {
+                [void][System.Windows.Forms.MessageBox]::Show("Please provide all three certificate files (cert, key, CA).", "Validation", "OK", "Warning")
+                return $false
+            }
+        }
+    }
+    elseif ($StepIndex -eq 3) {
+        # Service validation
+        if ($script:cbInstallService.Checked -and $script:txtServiceName.Text.Trim().Length -eq 0) {
+            [void][System.Windows.Forms.MessageBox]::Show("Service name is required.", "Validation", "OK", "Warning")
+            return $false
+        }
+    }
+    return $true
 }
 
 # ===================================================================

@@ -73,6 +73,8 @@ $FontLabel      = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawin
 $FontSmall      = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Regular)
 $FontMono       = New-Object System.Drawing.Font("Consolas", 9, [System.Drawing.FontStyle]::Regular)
 $FontMonoSmall  = New-Object System.Drawing.Font("Consolas", 8.5, [System.Drawing.FontStyle]::Regular)
+$FontStep       = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Regular)
+$FontStepActive = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
 
 # ---------------------------------------------------------------------------
 # State — current step and collected config values
@@ -102,7 +104,7 @@ $script:Config = @{
 # ---------------------------------------------------------------------------
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Dispatch Agent Setup"
-$form.Size = New-Object System.Drawing.Size((S 680), (S 500))
+$form.Size = New-Object System.Drawing.Size((S 716), (S 520))
 $form.StartPosition = "CenterScreen"
 $form.FormBorderStyle = "FixedSingle"
 $form.MaximizeBox = $false
@@ -235,28 +237,55 @@ function New-StyledRadio {
 }
 
 # ---------------------------------------------------------------------------
+# Sidebar — step labels on the left
+# ---------------------------------------------------------------------------
+$StepNames = @(
+    "Welcome",
+    "Agent Identity",
+    "Connection",
+    "Directories",
+    "Options",
+    "Review",
+    "Installing",
+    "Complete"
+)
+
+$sidebar = New-Object System.Windows.Forms.Panel
+$sidebar.Location = New-Object System.Drawing.Point(0, 0)
+$sidebar.Size = New-Object System.Drawing.Size((S 190), (S 520))
+$sidebar.BackColor = $ColorPanel
+
+$sideTitle = New-StyledLabel -Parent $sidebar -Text "Setup Steps" -X 14 -Y 14 -Width 170 -Height 28 -Font $FontLabel -ForeColor $ColorHighlight
+
+$script:stepLabels = @()
+for ($i = 0; $i -lt $StepNames.Count; $i++) {
+    $sl = New-StyledLabel -Parent $sidebar -Text "  $($i + 1). $($StepNames[$i])" -X 8 -Y (50 + $i * 28) -Width 174 -Height 24 -Font $FontStep -ForeColor $ColorDimGray
+    $script:stepLabels += $sl
+}
+
+$form.Controls.Add($sidebar)
+
+# ---------------------------------------------------------------------------
 # Content panel — holds each step's content (swapped on navigation)
 # ---------------------------------------------------------------------------
 $contentPanel = New-Object System.Windows.Forms.Panel
-$contentPanel.Location = New-Object System.Drawing.Point(0, 0)
-$contentPanel.Size = New-Object System.Drawing.Size((S 680), (S 420))
+$contentPanel.Location = New-Object System.Drawing.Point((S 190), 0)
+$contentPanel.Size = New-Object System.Drawing.Size((S 490), (S 420))
 $contentPanel.BackColor = $ColorDarkBg
 $form.Controls.Add($contentPanel)
 
 # ---------------------------------------------------------------------------
-# Bottom bar — navigation buttons + step indicator
+# Bottom bar — navigation buttons
 # ---------------------------------------------------------------------------
 $bottomBar = New-Object System.Windows.Forms.Panel
-$bottomBar.Location = New-Object System.Drawing.Point(0, (S 420))
-$bottomBar.Size = New-Object System.Drawing.Size((S 680), (S 50))
+$bottomBar.Location = New-Object System.Drawing.Point((S 190), (S 420))
+$bottomBar.Size = New-Object System.Drawing.Size((S 490), (S 50))
 $bottomBar.BackColor = $ColorPanel
 $form.Controls.Add($bottomBar)
 
-$lblStep = New-StyledLabel -Parent $bottomBar -Text "Step 1 of 8" -X 20 -Y 14 -Width 200 -Font $FontSmall -ForeColor $ColorDimGray
-
-$btnBack = New-StyledButton -Parent $bottomBar -Text "Back" -X 400 -Y 9 -Width 80 -Height 32
-$btnNext = New-StyledButton -Parent $bottomBar -Text "Next" -X 490 -Y 9 -Width 80 -Height 32 -BackColor $ColorHighlight
-$btnCancel = New-StyledButton -Parent $bottomBar -Text "Cancel" -X 580 -Y 9 -Width 80 -Height 32
+$btnBack = New-StyledButton -Parent $bottomBar -Text "Back" -X 210 -Y 9 -Width 80 -Height 32
+$btnNext = New-StyledButton -Parent $bottomBar -Text "Next" -X 300 -Y 9 -Width 80 -Height 32 -BackColor $ColorHighlight
+$btnCancel = New-StyledButton -Parent $bottomBar -Text "Cancel" -X 390 -Y 9 -Width 80 -Height 32
 
 # ---------------------------------------------------------------------------
 # Step panels — created once, shown/hidden as needed
@@ -268,30 +297,51 @@ $p0 = New-Object System.Windows.Forms.Panel
 $p0.Size = $contentPanel.Size
 $p0.BackColor = $ColorDarkBg
 
-New-StyledLabel -Parent $p0 -Text "Dispatch Agent Setup" -X 40 -Y 30 -Width 600 -Height 36 -Font $FontTitle -ForeColor $ColorHighlight | Out-Null
-New-StyledLabel -Parent $p0 -Text "This wizard will configure this machine as a named agent`nin your Dispatch Orchestrator network." -X 40 -Y 80 -Width 600 -Height 44 -Font $FontSubtitle | Out-Null
-New-StyledLabel -Parent $p0 -Text "Agents receive tasks from the orchestrator and run them using Claude Code.`nEach agent has a name and capabilities that determine which tasks it handles." -X 40 -Y 140 -Width 600 -Height 44 -Font $FontBody -ForeColor $ColorLightGray | Out-Null
+New-StyledLabel -Parent $p0 -Text "Dispatch Agent Setup" -X 20 -Y 14 -Width 450 -Height 36 -Font $FontTitle -ForeColor $ColorHighlight | Out-Null
+New-StyledLabel -Parent $p0 -Text "This wizard will configure this machine as a named agent`nin your Dispatch Orchestrator network." -X 20 -Y 54 -Width 450 -Height 44 -Font $FontSubtitle | Out-Null
 
-$diagramBox = New-Object System.Windows.Forms.TextBox
-$diagramBox.Multiline = $true
-$diagramBox.ReadOnly = $true
-$diagramBox.Location = New-Object System.Drawing.Point((S 40), (S 210))
-$diagramBox.Size = New-Object System.Drawing.Size((S 580), (S 100))
-$diagramBox.Font = $FontMono
-$diagramBox.BackColor = $ColorPanel
-$diagramBox.ForeColor = $ColorLightGray
-$diagramBox.BorderStyle = "FixedSingle"
-$diagramBox.Text = @"
-  Orchestrator ──relay──>  [This Machine]
-  (your main PC)          Agent "YourBot"
-                          claude --print
+# Architecture diagram image
+$diagramPath = Join-Path $ProjectRoot "logo"
+$diagramPath = Join-Path $diagramPath "agent-diagram-simple.png"
+if (-not (Test-Path $diagramPath)) {
+    $diagramPath = Join-Path $ProjectRoot "installer"
+    $diagramPath = Join-Path $diagramPath "assets"
+    $diagramPath = Join-Path $diagramPath "agent-diagram.png"
+}
+if (Test-Path $diagramPath) {
+    # Pre-scale the diagram with high-quality bicubic to avoid PictureBox pixelation
+    $diagramSrc = [System.Drawing.Image]::FromFile($diagramPath)
+    $dw = S 340; $dh = S 200
+    $diagramScaled = New-Object System.Drawing.Bitmap($dw, $dh, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    $dg = [System.Drawing.Graphics]::FromImage($diagramScaled)
+    $dg.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $dg.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+    $dg.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+    $dg.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+    # Fit preserving aspect ratio
+    $ratioW = $dw / $diagramSrc.Width; $ratioH = $dh / $diagramSrc.Height
+    $ratio = [math]::Min($ratioW, $ratioH)
+    [int]$sw = [math]::Floor($diagramSrc.Width * $ratio)
+    [int]$sh = [math]::Floor($diagramSrc.Height * $ratio)
+    [int]$sx = [math]::Floor(($dw - $sw) / 2)
+    [int]$sy = [math]::Floor(($dh - $sh) / 2)
+    $dg.Clear([System.Drawing.Color]::Transparent)
+    $dg.DrawImage($diagramSrc, $sx, $sy, $sw, $sh)
+    $dg.Dispose()
+    $diagramSrc.Dispose()
 
-  Tasks flow from the orchestrator to your agent via
-  a WebSocket relay connection (auto-discovered or manual).
-"@
-$p0.Controls.Add($diagramBox)
+    $diagramPic = New-Object System.Windows.Forms.PictureBox
+    $diagramPic.Location = New-Object System.Drawing.Point((S 60), (S 106))
+    $diagramPic.Size = New-Object System.Drawing.Size($dw, $dh)  # already scaled
+    $diagramPic.SizeMode = "CenterImage"
+    $diagramPic.BackColor = [System.Drawing.Color]::Transparent
+    $diagramPic.Image = $diagramScaled
+    $p0.Controls.Add($diagramPic)
+}
 
-New-StyledLabel -Parent $p0 -Text "Click Next to begin configuration." -X 40 -Y 330 -Width 600 -Height 24 -Font $FontBody -ForeColor $ColorDimGray | Out-Null
+New-StyledLabel -Parent $p0 -Text "Agents receive tasks from the orchestrator and run them`nusing Claude Code." -X 20 -Y 318 -Width 450 -Height 36 -Font $FontBody -ForeColor $ColorLightGray | Out-Null
+New-StyledLabel -Parent $p0 -Text "Click Next to begin configuration." -X 20 -Y 362 -Width 450 -Height 24 -Font $FontBody -ForeColor $ColorDimGray | Out-Null
+New-StyledLabel -Parent $p0 -Text "Project root: $ProjectRoot" -X 20 -Y 390 -Width 450 -Height 20 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
 $panels[0] = $p0
 
@@ -300,23 +350,23 @@ $p1 = New-Object System.Windows.Forms.Panel
 $p1.Size = $contentPanel.Size
 $p1.BackColor = $ColorDarkBg
 
-New-StyledLabel -Parent $p1 -Text "Agent Identity" -X 40 -Y 20 -Width 600 -Height 32 -Font $FontTitle -ForeColor $ColorHighlight | Out-Null
+New-StyledLabel -Parent $p1 -Text "Agent Identity" -X 20 -Y 20 -Width 450 -Height 32 -Font $FontTitle -ForeColor $ColorHighlight | Out-Null
 
-New-StyledLabel -Parent $p1 -Text "Agent Name (required)" -X 40 -Y 70 -Width 300 -Height 20 -Font $FontLabel | Out-Null
-$script:txtAgentName = New-StyledTextBox -Parent $p1 -Text "" -X 40 -Y 94 -Width 400
-New-StyledLabel -Parent $p1 -Text "e.g., CodeBot, ResearchBot, AnalysisAgent" -X 450 -Y 96 -Width 200 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+New-StyledLabel -Parent $p1 -Text "Agent Name (required)" -X 20 -Y 70 -Width 300 -Height 20 -Font $FontLabel | Out-Null
+$script:txtAgentName = New-StyledTextBox -Parent $p1 -Text "" -X 20 -Y 94 -Width 280
+New-StyledLabel -Parent $p1 -Text "e.g., CodeBot, ResearchBot" -X 310 -Y 96 -Width 150 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
-New-StyledLabel -Parent $p1 -Text "Agent Description" -X 40 -Y 134 -Width 300 -Height 20 -Font $FontLabel | Out-Null
-$script:txtAgentDesc = New-StyledTextBox -Parent $p1 -Text "" -X 40 -Y 158 -Width 580
-New-StyledLabel -Parent $p1 -Text "e.g., Handles coding and code review tasks" -X 40 -Y 186 -Width 400 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+New-StyledLabel -Parent $p1 -Text "Agent Description" -X 20 -Y 134 -Width 300 -Height 20 -Font $FontLabel | Out-Null
+$script:txtAgentDesc = New-StyledTextBox -Parent $p1 -Text "" -X 20 -Y 158 -Width 430
+New-StyledLabel -Parent $p1 -Text "e.g., Handles coding and code review tasks" -X 20 -Y 186 -Width 400 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
-New-StyledLabel -Parent $p1 -Text "Capabilities (comma-separated tags)" -X 40 -Y 216 -Width 300 -Height 20 -Font $FontLabel | Out-Null
-$script:txtCapabilities = New-StyledTextBox -Parent $p1 -Text "code, refactor, review, debug" -X 40 -Y 240 -Width 580
-New-StyledLabel -Parent $p1 -Text "The orchestrator routes tasks to agents by name or capability match" -X 40 -Y 268 -Width 500 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+New-StyledLabel -Parent $p1 -Text "Capabilities (comma-separated tags)" -X 20 -Y 216 -Width 300 -Height 20 -Font $FontLabel | Out-Null
+$script:txtCapabilities = New-StyledTextBox -Parent $p1 -Text "code, refactor, review, debug" -X 20 -Y 240 -Width 430
+New-StyledLabel -Parent $p1 -Text "The orchestrator routes tasks to agents by name or capability match" -X 20 -Y 268 -Width 440 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
-New-StyledLabel -Parent $p1 -Text "Machine ID" -X 40 -Y 304 -Width 300 -Height 20 -Font $FontLabel | Out-Null
-$script:txtMachineId = New-StyledTextBox -Parent $p1 -Text $script:Config.machineId -X 40 -Y 328 -Width 300
-New-StyledLabel -Parent $p1 -Text "Auto-generated, editable" -X 350 -Y 330 -Width 200 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+New-StyledLabel -Parent $p1 -Text "Machine ID" -X 20 -Y 304 -Width 300 -Height 20 -Font $FontLabel | Out-Null
+$script:txtMachineId = New-StyledTextBox -Parent $p1 -Text $script:Config.machineId -X 20 -Y 328 -Width 260
+New-StyledLabel -Parent $p1 -Text "Auto-generated, editable" -X 290 -Y 330 -Width 170 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
 $panels[1] = $p1
 
@@ -325,14 +375,14 @@ $p2 = New-Object System.Windows.Forms.Panel
 $p2.Size = $contentPanel.Size
 $p2.BackColor = $ColorDarkBg
 
-New-StyledLabel -Parent $p2 -Text "Connection" -X 40 -Y 20 -Width 600 -Height 32 -Font $FontTitle -ForeColor $ColorHighlight | Out-Null
-New-StyledLabel -Parent $p2 -Text "How should this agent find the orchestrator?" -X 40 -Y 58 -Width 500 -Height 22 -Font $FontSubtitle | Out-Null
+New-StyledLabel -Parent $p2 -Text "Connection" -X 20 -Y 20 -Width 450 -Height 32 -Font $FontTitle -ForeColor $ColorHighlight | Out-Null
+New-StyledLabel -Parent $p2 -Text "How should this agent find the orchestrator?" -X 20 -Y 58 -Width 440 -Height 22 -Font $FontSubtitle | Out-Null
 
-$script:radioAuto = New-StyledRadio -Parent $p2 -Text "Auto-discover on local network (UDP broadcast)" -X 40 -Y 96 -Checked $true
-$script:radioManual = New-StyledRadio -Parent $p2 -Text "Connect to specific address" -X 40 -Y 124
+$script:radioAuto = New-StyledRadio -Parent $p2 -Text "Auto-discover on local network (UDP broadcast)" -X 20 -Y 96 -Width 430 -Checked $true
+$script:radioManual = New-StyledRadio -Parent $p2 -Text "Connect to specific address" -X 20 -Y 124 -Width 430
 
-New-StyledLabel -Parent $p2 -Text "Orchestrator address:" -X 60 -Y 158 -Width 200 -Height 20 -Font $FontLabel | Out-Null
-$script:txtCoordAddr = New-StyledTextBox -Parent $p2 -Text "ws://192.168.1.100:7070" -X 60 -Y 182 -Width 360
+New-StyledLabel -Parent $p2 -Text "Orchestrator address:" -X 40 -Y 158 -Width 200 -Height 20 -Font $FontLabel | Out-Null
+$script:txtCoordAddr = New-StyledTextBox -Parent $p2 -Text "ws://192.168.1.100:7070" -X 40 -Y 182 -Width 340
 $script:txtCoordAddr.Enabled = $false
 
 $script:radioAuto.Add_CheckedChanged({
@@ -346,12 +396,12 @@ $script:radioManual.Add_CheckedChanged({
     }
 })
 
-New-StyledLabel -Parent $p2 -Text "Shared Secret (required)" -X 40 -Y 224 -Width 300 -Height 20 -Font $FontLabel | Out-Null
-$script:txtSecret = New-StyledTextBox -Parent $p2 -Text "" -X 40 -Y 248 -Width 360
-New-StyledLabel -Parent $p2 -Text "Get this from whoever set up the orchestrator" -X 40 -Y 276 -Width 400 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+New-StyledLabel -Parent $p2 -Text "Shared Secret (required)" -X 20 -Y 224 -Width 300 -Height 20 -Font $FontLabel | Out-Null
+$script:txtSecret = New-StyledTextBox -Parent $p2 -Text "" -X 20 -Y 248 -Width 340
+New-StyledLabel -Parent $p2 -Text "Get this from whoever set up the orchestrator" -X 20 -Y 276 -Width 400 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
-$script:lblTestResult = New-StyledLabel -Parent $p2 -Text "" -X 60 -Y 328 -Width 500 -Height 22 -Font $FontBody -ForeColor $ColorLightGray
-$script:btnTest = New-StyledButton -Parent $p2 -Text "Test Connection" -X 40 -Y 310 -Width 140 -Height 30 -BackColor $ColorAccent
+$script:btnTest = New-StyledButton -Parent $p2 -Text "Test Connection" -X 20 -Y 310 -Width 140 -Height 30 -BackColor $ColorAccent
+$script:lblTestResult = New-StyledLabel -Parent $p2 -Text "" -X 170 -Y 316 -Width 280 -Height 22 -Font $FontSmall -ForeColor $ColorLightGray
 
 $script:btnTest.Add_Click({
     $script:lblTestResult.Text = "Testing..."
@@ -377,11 +427,14 @@ try {
     `$socket.Close()
 }
 "@
-            if ($udpResult -like "OK:*") {
-                $script:lblTestResult.Text = "Connected! Relay found: $($udpResult.Substring(3))"
+            # Flatten array output to a single string
+            $udpStr = if ($udpResult -is [array]) { $udpResult -join "" } else { "$udpResult" }
+            if ($udpStr -like "OK:*") {
+                $script:lblTestResult.Text = "OK! Relay found"
                 $script:lblTestResult.ForeColor = $ColorGreen
             } else {
-                $script:lblTestResult.Text = "Failed: $($udpResult.Substring(5))"
+                $msg = $udpStr -replace "^FAIL:", ""
+                $script:lblTestResult.Text = "Failed: $msg"
                 $script:lblTestResult.ForeColor = $ColorRed
             }
         } catch {
@@ -395,11 +448,11 @@ try {
         try {
             $headers = @{ "Authorization" = "Bearer $secret" }
             $response = Invoke-WebRequest -Uri "$addr/status" -Headers $headers -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop
-            $script:lblTestResult.Text = "Connected! Status: $($response.StatusCode)"
+            $script:lblTestResult.Text = "OK! Status $($response.StatusCode)"
             $script:lblTestResult.ForeColor = $ColorGreen
         } catch {
             $errMsg = $_.Exception.Message
-            if ($errMsg.Length -gt 60) { $errMsg = $errMsg.Substring(0, 60) + "..." }
+            if ($errMsg -and $errMsg.Length -gt 50) { $errMsg = $errMsg.Substring(0, 50) + "..." }
             $script:lblTestResult.Text = "Failed: $errMsg"
             $script:lblTestResult.ForeColor = $ColorRed
         }
@@ -413,11 +466,11 @@ $p3 = New-Object System.Windows.Forms.Panel
 $p3.Size = $contentPanel.Size
 $p3.BackColor = $ColorDarkBg
 
-New-StyledLabel -Parent $p3 -Text "Working Directories" -X 40 -Y 20 -Width 600 -Height 32 -Font $FontTitle -ForeColor $ColorHighlight | Out-Null
+New-StyledLabel -Parent $p3 -Text "Working Directories" -X 20 -Y 20 -Width 450 -Height 32 -Font $FontTitle -ForeColor $ColorHighlight | Out-Null
 
-New-StyledLabel -Parent $p3 -Text "Default Working Directory" -X 40 -Y 64 -Width 300 -Height 20 -Font $FontLabel | Out-Null
-$script:txtWorkDir = New-StyledTextBox -Parent $p3 -Text "C:\workspace" -X 40 -Y 88 -Width 470
-$script:btnBrowseWork = New-StyledButton -Parent $p3 -Text "Browse..." -X 520 -Y 86 -Width 100 -Height 28
+New-StyledLabel -Parent $p3 -Text "Default Working Directory" -X 20 -Y 64 -Width 300 -Height 20 -Font $FontLabel | Out-Null
+$script:txtWorkDir = New-StyledTextBox -Parent $p3 -Text "C:\workspace" -X 20 -Y 88 -Width 330
+$script:btnBrowseWork = New-StyledButton -Parent $p3 -Text "Browse..." -X 360 -Y 86 -Width 90 -Height 28
 
 $script:btnBrowseWork.Add_Click({
     $fbd = New-Object System.Windows.Forms.FolderBrowserDialog
@@ -436,12 +489,12 @@ $script:btnBrowseWork.Add_Click({
     }
 })
 
-New-StyledLabel -Parent $p3 -Text "Allowed Directories (one per line)" -X 40 -Y 128 -Width 300 -Height 20 -Font $FontLabel | Out-Null
+New-StyledLabel -Parent $p3 -Text "Allowed Directories (one per line)" -X 20 -Y 128 -Width 300 -Height 20 -Font $FontLabel | Out-Null
 $script:txtAllowed = New-Object System.Windows.Forms.TextBox
 $script:txtAllowed.Multiline = $true
 $script:txtAllowed.ScrollBars = "Vertical"
-$script:txtAllowed.Location = New-Object System.Drawing.Point((S 40), (S 150))
-$script:txtAllowed.Size = New-Object System.Drawing.Size((S 470), (S 60))
+$script:txtAllowed.Location = New-Object System.Drawing.Point((S 20), (S 150))
+$script:txtAllowed.Size = New-Object System.Drawing.Size((S 330), (S 60))
 $script:txtAllowed.Font = $FontMonoSmall
 $script:txtAllowed.BackColor = $ColorInputBg
 $script:txtAllowed.ForeColor = $ColorWhite
@@ -449,7 +502,7 @@ $script:txtAllowed.BorderStyle = "FixedSingle"
 $script:txtAllowed.Text = "C:\workspace"
 $p3.Controls.Add($script:txtAllowed)
 
-$script:btnAddAllowed = New-StyledButton -Parent $p3 -Text "Add Folder..." -X 520 -Y 152 -Width 100 -Height 28
+$script:btnAddAllowed = New-StyledButton -Parent $p3 -Text "Add Folder..." -X 360 -Y 152 -Width 90 -Height 28
 
 $script:btnAddAllowed.Add_Click({
     $fbd = New-Object System.Windows.Forms.FolderBrowserDialog
@@ -463,12 +516,12 @@ $script:btnAddAllowed.Add_Click({
     }
 })
 
-New-StyledLabel -Parent $p3 -Text "Denied Directories (one per line)" -X 40 -Y 222 -Width 300 -Height 20 -Font $FontLabel | Out-Null
+New-StyledLabel -Parent $p3 -Text "Denied Directories (one per line)" -X 20 -Y 222 -Width 300 -Height 20 -Font $FontLabel | Out-Null
 $script:txtDenied = New-Object System.Windows.Forms.TextBox
 $script:txtDenied.Multiline = $true
 $script:txtDenied.ScrollBars = "Vertical"
-$script:txtDenied.Location = New-Object System.Drawing.Point((S 40), (S 244))
-$script:txtDenied.Size = New-Object System.Drawing.Size((S 580), (S 80))
+$script:txtDenied.Location = New-Object System.Drawing.Point((S 20), (S 244))
+$script:txtDenied.Size = New-Object System.Drawing.Size((S 430), (S 80))
 $script:txtDenied.Font = $FontMonoSmall
 $script:txtDenied.BackColor = $ColorInputBg
 $script:txtDenied.ForeColor = $ColorWhite
@@ -476,7 +529,7 @@ $script:txtDenied.BorderStyle = "FixedSingle"
 $script:txtDenied.Text = "C:\Windows`r`nC:\Program Files`r`nC:\Program Files (x86)`r`nC:\Users\*\AppData"
 $p3.Controls.Add($script:txtDenied)
 
-New-StyledLabel -Parent $p3 -Text "The agent will only execute tasks in allowed directories. System directories are blocked for safety." -X 40 -Y 336 -Width 600 -Height 36 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+New-StyledLabel -Parent $p3 -Text "The agent will only execute tasks in allowed directories.`nSystem directories are blocked for safety." -X 20 -Y 336 -Width 430 -Height 36 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
 $panels[3] = $p3
 
@@ -485,29 +538,29 @@ $p4 = New-Object System.Windows.Forms.Panel
 $p4.Size = $contentPanel.Size
 $p4.BackColor = $ColorDarkBg
 
-New-StyledLabel -Parent $p4 -Text "Options" -X 40 -Y 20 -Width 600 -Height 32 -Font $FontTitle -ForeColor $ColorHighlight | Out-Null
+New-StyledLabel -Parent $p4 -Text "Options" -X 20 -Y 20 -Width 450 -Height 32 -Font $FontTitle -ForeColor $ColorHighlight | Out-Null
 
-$script:chkKeepAwake = New-StyledCheckBox -Parent $p4 -Text "Keep machine awake while agent is running" -X 40 -Y 72 -Checked $true
-$script:chkTls = New-StyledCheckBox -Parent $p4 -Text "Enable TLS encryption" -X 40 -Y 102 -Checked $false
-New-StyledLabel -Parent $p4 -Text "Enable only if the orchestrator has TLS configured" -X 68 -Y 128 -Width 400 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+$script:chkKeepAwake = New-StyledCheckBox -Parent $p4 -Text "Keep machine awake while agent is running" -X 20 -Y 72 -Width 430 -Checked $true
+$script:chkTls = New-StyledCheckBox -Parent $p4 -Text "Enable TLS encryption" -X 20 -Y 102 -Width 430 -Checked $false
+New-StyledLabel -Parent $p4 -Text "Enable only if the orchestrator has TLS configured" -X 48 -Y 128 -Width 400 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
 # Detect NSSM
 $nssmAvailable = $null -ne (Get-Command nssm.exe -ErrorAction SilentlyContinue)
-$script:chkService = New-StyledCheckBox -Parent $p4 -Text "Install as Windows service" -X 40 -Y 158 -Checked $false
+$script:chkService = New-StyledCheckBox -Parent $p4 -Text "Install as Windows service" -X 20 -Y 158 -Width 430 -Checked $false
 if (-not $nssmAvailable) {
     $script:chkService.Enabled = $false
-    New-StyledLabel -Parent $p4 -Text "NSSM not detected. Install NSSM to enable service mode." -X 68 -Y 184 -Width 500 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+    New-StyledLabel -Parent $p4 -Text "NSSM not detected. Install NSSM to enable service mode." -X 48 -Y 184 -Width 400 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 } else {
-    New-StyledLabel -Parent $p4 -Text "NSSM detected. The agent will start automatically with Windows." -X 68 -Y 184 -Width 500 -Height 18 -Font $FontSmall -ForeColor $ColorGreen | Out-Null
+    New-StyledLabel -Parent $p4 -Text "NSSM detected. Agent will start automatically with Windows." -X 48 -Y 184 -Width 400 -Height 18 -Font $FontSmall -ForeColor $ColorGreen | Out-Null
 }
 
-$script:chkStartAfter = New-StyledCheckBox -Parent $p4 -Text "Start agent after setup completes" -X 40 -Y 214 -Checked $true
+$script:chkStartAfter = New-StyledCheckBox -Parent $p4 -Text "Start agent after setup completes" -X 20 -Y 214 -Width 430 -Checked $true
 
-New-StyledLabel -Parent $p4 -Text "Max Output Size" -X 40 -Y 264 -Width 200 -Height 20 -Font $FontLabel | Out-Null
+New-StyledLabel -Parent $p4 -Text "Max Output Size" -X 20 -Y 264 -Width 200 -Height 20 -Font $FontLabel | Out-Null
 $script:cmbMaxOutput = New-Object System.Windows.Forms.ComboBox
 $script:cmbMaxOutput.DropDownStyle = "DropDownList"
-$script:cmbMaxOutput.Location = New-Object System.Drawing.Point((S 40), (S 288))
-$script:cmbMaxOutput.Size = New-Object System.Drawing.Size((S 200), (S 28))
+$script:cmbMaxOutput.Location = New-Object System.Drawing.Point((S 20), (S 288))
+$script:cmbMaxOutput.Size = New-Object System.Drawing.Size((S 180), (S 28))
 $script:cmbMaxOutput.Font = $FontBody
 $script:cmbMaxOutput.BackColor = $ColorInputBg
 $script:cmbMaxOutput.ForeColor = $ColorWhite
@@ -515,7 +568,7 @@ $script:cmbMaxOutput.FlatStyle = "Flat"
 $script:cmbMaxOutput.Items.AddRange(@("100 KB", "500 KB", "1 MB", "5 MB", "10 MB"))
 $script:cmbMaxOutput.SelectedIndex = 2  # 1 MB default
 $p4.Controls.Add($script:cmbMaxOutput)
-New-StyledLabel -Parent $p4 -Text "Maximum size of task output returned to the orchestrator" -X 250 -Y 290 -Width 400 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+New-StyledLabel -Parent $p4 -Text "Max task output returned to the orchestrator" -X 210 -Y 290 -Width 240 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
 $panels[4] = $p4
 
@@ -524,16 +577,16 @@ $p5 = New-Object System.Windows.Forms.Panel
 $p5.Size = $contentPanel.Size
 $p5.BackColor = $ColorDarkBg
 
-New-StyledLabel -Parent $p5 -Text "Review Configuration" -X 40 -Y 20 -Width 600 -Height 32 -Font $FontTitle -ForeColor $ColorHighlight | Out-Null
-New-StyledLabel -Parent $p5 -Text "Review your settings below. Click Install to proceed." -X 40 -Y 56 -Width 500 -Height 22 -Font $FontSubtitle | Out-Null
+New-StyledLabel -Parent $p5 -Text "Review Configuration" -X 20 -Y 20 -Width 450 -Height 32 -Font $FontTitle -ForeColor $ColorHighlight | Out-Null
+New-StyledLabel -Parent $p5 -Text "Review your settings below. Click Install to proceed." -X 20 -Y 56 -Width 440 -Height 22 -Font $FontSubtitle | Out-Null
 
 $script:txtReview = New-Object System.Windows.Forms.TextBox
 $script:txtReview.Multiline = $true
 $script:txtReview.ReadOnly = $true
 $script:txtReview.ScrollBars = "Both"
 $script:txtReview.WordWrap = $false
-$script:txtReview.Location = New-Object System.Drawing.Point((S 40), (S 86))
-$script:txtReview.Size = New-Object System.Drawing.Size((S 600), (S 300))
+$script:txtReview.Location = New-Object System.Drawing.Point((S 20), (S 86))
+$script:txtReview.Size = New-Object System.Drawing.Size((S 440), (S 300))
 $script:txtReview.Font = $FontMono
 $script:txtReview.BackColor = $ColorPanel
 $script:txtReview.ForeColor = $ColorLightGray
@@ -547,11 +600,11 @@ $p6 = New-Object System.Windows.Forms.Panel
 $p6.Size = $contentPanel.Size
 $p6.BackColor = $ColorDarkBg
 
-New-StyledLabel -Parent $p6 -Text "Installing..." -X 40 -Y 20 -Width 600 -Height 32 -Font $FontTitle -ForeColor $ColorHighlight | Out-Null
+New-StyledLabel -Parent $p6 -Text "Installing..." -X 20 -Y 20 -Width 450 -Height 32 -Font $FontTitle -ForeColor $ColorHighlight | Out-Null
 
 $script:progressBar = New-Object System.Windows.Forms.ProgressBar
-$script:progressBar.Location = New-Object System.Drawing.Point((S 40), (S 66))
-$script:progressBar.Size = New-Object System.Drawing.Size((S 600), (S 24))
+$script:progressBar.Location = New-Object System.Drawing.Point((S 20), (S 66))
+$script:progressBar.Size = New-Object System.Drawing.Size((S 440), (S 24))
 $script:progressBar.Style = "Continuous"
 $script:progressBar.Minimum = 0
 $script:progressBar.Maximum = 100
@@ -561,8 +614,8 @@ $script:txtInstallLog = New-Object System.Windows.Forms.TextBox
 $script:txtInstallLog.Multiline = $true
 $script:txtInstallLog.ReadOnly = $true
 $script:txtInstallLog.ScrollBars = "Vertical"
-$script:txtInstallLog.Location = New-Object System.Drawing.Point((S 40), (S 100))
-$script:txtInstallLog.Size = New-Object System.Drawing.Size((S 600), (S 290))
+$script:txtInstallLog.Location = New-Object System.Drawing.Point((S 20), (S 100))
+$script:txtInstallLog.Size = New-Object System.Drawing.Size((S 440), (S 290))
 $script:txtInstallLog.Font = $FontMonoSmall
 $script:txtInstallLog.BackColor = $ColorPanel
 $script:txtInstallLog.ForeColor = $ColorLightGray
@@ -576,10 +629,10 @@ $p7 = New-Object System.Windows.Forms.Panel
 $p7.Size = $contentPanel.Size
 $p7.BackColor = $ColorDarkBg
 
-New-StyledLabel -Parent $p7 -Text "Setup Complete" -X 40 -Y 30 -Width 600 -Height 36 -Font $FontTitle -ForeColor $ColorGreen | Out-Null
-$script:lblCompleteStatus = New-StyledLabel -Parent $p7 -Text "" -X 40 -Y 80 -Width 600 -Height 60 -Font $FontSubtitle
-$script:lblCompleteAgent = New-StyledLabel -Parent $p7 -Text "" -X 40 -Y 150 -Width 600 -Height 30 -Font $FontBody -ForeColor $ColorLightGray
-$script:lblCompleteHint = New-StyledLabel -Parent $p7 -Text "" -X 40 -Y 200 -Width 600 -Height 80 -Font $FontBody -ForeColor $ColorDimGray
+New-StyledLabel -Parent $p7 -Text "Setup Complete" -X 20 -Y 30 -Width 450 -Height 36 -Font $FontTitle -ForeColor $ColorGreen | Out-Null
+$script:lblCompleteStatus = New-StyledLabel -Parent $p7 -Text "" -X 20 -Y 80 -Width 450 -Height 60 -Font $FontSubtitle
+$script:lblCompleteAgent = New-StyledLabel -Parent $p7 -Text "" -X 20 -Y 150 -Width 450 -Height 30 -Font $FontBody -ForeColor $ColorLightGray
+$script:lblCompleteHint = New-StyledLabel -Parent $p7 -Text "" -X 20 -Y 200 -Width 450 -Height 80 -Font $FontBody -ForeColor $ColorDimGray
 
 $panels[7] = $p7
 
@@ -667,6 +720,27 @@ function Write-InstallLog {
 }
 
 # ---------------------------------------------------------------------------
+# Update sidebar to highlight the current step
+# ---------------------------------------------------------------------------
+function Update-Sidebar {
+    for ($i = 0; $i -lt $script:stepLabels.Count; $i++) {
+        if ($i -eq $script:CurrentStep) {
+            $script:stepLabels[$i].Font = $FontStepActive
+            $script:stepLabels[$i].ForeColor = $ColorHighlight
+            $script:stepLabels[$i].BackColor = $ColorAccent
+        } elseif ($i -lt $script:CurrentStep) {
+            $script:stepLabels[$i].Font = $FontStep
+            $script:stepLabels[$i].ForeColor = $ColorGreen
+            $script:stepLabels[$i].BackColor = [System.Drawing.Color]::Transparent
+        } else {
+            $script:stepLabels[$i].Font = $FontStep
+            $script:stepLabels[$i].ForeColor = $ColorDimGray
+            $script:stepLabels[$i].BackColor = [System.Drawing.Color]::Transparent
+        }
+    }
+}
+
+# ---------------------------------------------------------------------------
 # Show a specific step panel
 # ---------------------------------------------------------------------------
 function Show-Step {
@@ -677,7 +751,8 @@ function Show-Step {
         $contentPanel.Controls.Add($panels[$StepIndex])
     }
 
-    $lblStep.Text = "Step $($StepIndex + 1) of $($script:TotalSteps)"
+    $script:CurrentStep = $StepIndex
+    Update-Sidebar
 
     # Navigation button visibility
     $btnBack.Visible = ($StepIndex -gt 0) -and ($StepIndex -lt 6)
@@ -715,8 +790,6 @@ $json
 "@
         $script:txtReview.Text = $summary
     }
-
-    $script:CurrentStep = $StepIndex
 }
 
 # ---------------------------------------------------------------------------
@@ -725,32 +798,30 @@ $json
 function Validate-Step {
     param([int]$StepIndex)
 
-    switch ($StepIndex) {
-        1 {
-            if ($script:txtAgentName.Text.Trim() -eq "") {
-                [System.Windows.Forms.MessageBox]::Show("Agent name is required.", "Validation", "OK", "Warning")
-                return $false
-            }
-            if ($script:txtMachineId.Text.Trim() -eq "") {
-                [System.Windows.Forms.MessageBox]::Show("Machine ID is required.", "Validation", "OK", "Warning")
-                return $false
-            }
+    if ($StepIndex -eq 1) {
+        if ($script:txtAgentName.Text.Trim() -eq "") {
+            [void][System.Windows.Forms.MessageBox]::Show("Agent name is required.", "Validation", "OK", "Warning")
+            return $false
         }
-        2 {
-            if ($script:txtSecret.Text.Trim() -eq "") {
-                [System.Windows.Forms.MessageBox]::Show("Shared secret is required. Get this from whoever set up the orchestrator.", "Validation", "OK", "Warning")
-                return $false
-            }
-            if ($script:radioManual.Checked -and $script:txtCoordAddr.Text.Trim() -eq "") {
-                [System.Windows.Forms.MessageBox]::Show("Orchestrator address is required for manual connection.", "Validation", "OK", "Warning")
-                return $false
-            }
+        if ($script:txtMachineId.Text.Trim() -eq "") {
+            [void][System.Windows.Forms.MessageBox]::Show("Machine ID is required.", "Validation", "OK", "Warning")
+            return $false
         }
-        3 {
-            if ($script:txtWorkDir.Text.Trim() -eq "") {
-                [System.Windows.Forms.MessageBox]::Show("Default working directory is required.", "Validation", "OK", "Warning")
-                return $false
-            }
+    }
+    elseif ($StepIndex -eq 2) {
+        if ($script:txtSecret.Text.Trim() -eq "") {
+            [void][System.Windows.Forms.MessageBox]::Show("Shared secret is required. Get this from whoever set up the orchestrator.", "Validation", "OK", "Warning")
+            return $false
+        }
+        if ($script:radioManual.Checked -and $script:txtCoordAddr.Text.Trim() -eq "") {
+            [void][System.Windows.Forms.MessageBox]::Show("Orchestrator address is required for manual connection.", "Validation", "OK", "Warning")
+            return $false
+        }
+    }
+    elseif ($StepIndex -eq 3) {
+        if ($script:txtWorkDir.Text.Trim() -eq "") {
+            [void][System.Windows.Forms.MessageBox]::Show("Default working directory is required.", "Validation", "OK", "Warning")
+            return $false
         }
     }
     return $true

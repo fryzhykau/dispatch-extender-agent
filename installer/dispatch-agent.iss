@@ -84,6 +84,9 @@ Source: "agent-package.json";            DestDir: "{app}"; DestName: "package.js
 ; Icon for uninstall display and shortcuts
 Source: "assets\agent-icon.ico";         DestDir: "{app}\installer\assets"; DestName: "icon.ico"; Flags: ignoreversion
 
+; Diagram for agent setup wizard welcome page
+Source: "..\logo\agent-diagram-simple.png"; DestDir: "{app}\installer\assets"; DestName: "agent-diagram.png"; Flags: ignoreversion
+
 ; --------------------------------------------------------------------------
 ; Registry entries
 ; --------------------------------------------------------------------------
