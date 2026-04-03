@@ -774,13 +774,10 @@ New-StyledLabel -Parent $p10 -Text "Get this from whoever set up the orchestrato
 New-StyledLabel -Parent $p10 -Text "Connection" -X 20 -Y 200 -Width 300 -Height 20 -Font $FontLabel | Out-Null
 
 # Group container to isolate radios from welcome page radios
-$basicConnGroup = New-Object System.Windows.Forms.GroupBox
+$basicConnGroup = New-Object System.Windows.Forms.Panel
 $basicConnGroup.Location = New-Object System.Drawing.Point((S 20), (S 218))
 $basicConnGroup.Size = New-Object System.Drawing.Size((S 440), (S 80))
-$basicConnGroup.FlatStyle = "Flat"
-$basicConnGroup.ForeColor = $ColorDarkBg
 $basicConnGroup.BackColor = [System.Drawing.Color]::Transparent
-$basicConnGroup.Text = ""
 $p10.Controls.Add($basicConnGroup)
 
 $script:radioBasicAuto = New-StyledRadio -Parent $basicConnGroup -Text "Auto-discover on local network (recommended)" -X 0 -Y 0 -Width 430 -Checked $true
