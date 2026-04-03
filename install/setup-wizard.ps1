@@ -95,16 +95,16 @@ $F_ICON     = New-Object System.Drawing.Font("Segoe UI", 22)
 $script:CurrentStep = 0
 $script:SelectedRole = "coordinator"  # Orchestrator installer is always coordinator
 $script:InstallCancelled = $false
+$script:SetupMode = "basic"  # "basic" or "advanced"
 
-$StepNames = @(
-    "Welcome",
-    "Configuration",
-    "TLS Settings",
-    "Windows Service",
-    "Review",
-    "Installing",
-    "Complete"
-)
+# Step flow sequences for each mode (panel indices)
+# Basic:    Welcome(0) -> BasicConfig(10) -> Review(4) -> Installing(5) -> Complete(6)
+# Advanced: Welcome(0) -> Config(1) -> TLS(2) -> Service(3) -> Review(4) -> Installing(5) -> Complete(6)
+$script:BasicFlow    = @(0, 10, 4, 5, 6)
+$script:AdvancedFlow = @(0, 1, 2, 3, 4, 5, 6)
+
+$script:BasicSidebarNames    = @("Welcome", "Configuration", "Review", "Installing", "Complete")
+$script:AdvancedSidebarNames = @("Welcome", "Configuration", "TLS Settings", "Windows Service", "Review", "Installing", "Complete")
 
 # ---------------------------------------------------------------------------
 # Helper: create a styled label
@@ -275,12 +275,29 @@ $sidebar.BackColor = $C_PANEL
 $sideTitle = New-StyledLabel -Text "Setup Steps" -X 14 -Y 14 -Width 170 -Height 28 -Font $F_SUBTITLE -Color $C_HIGHLIGHT
 $sidebar.Controls.Add($sideTitle)
 
+# Create max sidebar labels (7 slots) -- rebuilt dynamically by Rebuild-Sidebar
 $script:stepLabels = @()
-for ($i = 0; $i -lt $StepNames.Count; $i++) {
-    $sl = New-StyledLabel -Text "  $($i + 1). $($StepNames[$i])" -X 8 -Y (50 + $i * 28) -Width 174 -Height 24 -Font $F_STEP -Color $C_TEXTDIM
+for ($i = 0; $i -lt 7; $i++) {
+    $sl = New-StyledLabel -Text "" -X 8 -Y (50 + $i * 28) -Width 174 -Height 24 -Font $F_STEP -Color $C_TEXTDIM
+    $sl.Visible = $false
     $sidebar.Controls.Add($sl)
     $script:stepLabels += $sl
 }
+
+function Rebuild-Sidebar {
+    $names = if ($script:SetupMode -eq "basic") { $script:BasicSidebarNames } else { $script:AdvancedSidebarNames }
+    for ($i = 0; $i -lt $script:stepLabels.Count; $i++) {
+        if ($i -lt $names.Count) {
+            $script:stepLabels[$i].Text = "  $($i + 1). $($names[$i])"
+            $script:stepLabels[$i].Visible = $true
+        } else {
+            $script:stepLabels[$i].Text = ""
+            $script:stepLabels[$i].Visible = $false
+        }
+    }
+}
+
+Rebuild-Sidebar
 
 $form.Controls.Add($sidebar)
 
@@ -314,7 +331,7 @@ $buttonBar.Controls.Add($btnCancel)
 # ===================================================================
 # STEP PANELS
 # ===================================================================
-$panels = @()
+$panels = @{}
 
 # ---------------------------------------------------------------------------
 # STEP 0: Welcome
@@ -365,9 +382,56 @@ if (Test-Path $diagramPath) {
 
 $p0.Controls.Add((New-StyledLabel -Text "This wizard will configure this machine as the Orchestrator." `
     -X 20 -Y 368 -Width 470 -Height 24 -Font $F_NORMAL))
-$p0.Controls.Add((New-StyledLabel -Text "Click Next to begin." -X 20 -Y 396 -Width 460 -Height 24 -Font $F_NORMAL -Color $C_TEXTDIM))
-$p0.Controls.Add((New-StyledLabel -Text "Project root: $ProjectRoot" -X 20 -Y 430 -Width 460 -Height 20 -Font $F_SMALL -Color $C_TEXTDIM))
-$panels += $p0
+
+# Setup mode selection -- group container to isolate radio buttons
+$modeGroup = New-Object System.Windows.Forms.GroupBox
+$modeGroup.Location = New-Object System.Drawing.Point((S 20), (S 394))
+$modeGroup.Size = New-Object System.Drawing.Size((S 460), (S 50))
+$modeGroup.FlatStyle = "Flat"
+$modeGroup.ForeColor = $C_BG
+$modeGroup.BackColor = [System.Drawing.Color]::Transparent
+$modeGroup.Text = ""
+$p0.Controls.Add($modeGroup)
+
+$script:radioBasicMode = New-Object System.Windows.Forms.RadioButton
+$script:radioBasicMode.Text = "Basic Setup (recommended)"
+$script:radioBasicMode.Location = New-Object System.Drawing.Point((S 0), (S 0))
+$script:radioBasicMode.Size = New-Object System.Drawing.Size((S 210), (S 22))
+$script:radioBasicMode.Font = $F_NORMAL
+$script:radioBasicMode.ForeColor = $C_TEXT
+$script:radioBasicMode.BackColor = [System.Drawing.Color]::Transparent
+$script:radioBasicMode.Checked = $true
+$modeGroup.Controls.Add($script:radioBasicMode)
+
+$script:radioAdvancedMode = New-Object System.Windows.Forms.RadioButton
+$script:radioAdvancedMode.Text = "Advanced Setup"
+$script:radioAdvancedMode.Location = New-Object System.Drawing.Point((S 220), (S 0))
+$script:radioAdvancedMode.Size = New-Object System.Drawing.Size((S 200), (S 22))
+$script:radioAdvancedMode.Font = $F_NORMAL
+$script:radioAdvancedMode.ForeColor = $C_TEXT
+$script:radioAdvancedMode.BackColor = [System.Drawing.Color]::Transparent
+$modeGroup.Controls.Add($script:radioAdvancedMode)
+
+$script:lblModeDesc = New-StyledLabel -Text "Quick setup -- port, shared secret, and PIN. Uses sensible defaults." -X 0 -Y 24 -Width 450 -Height 18 -Font $F_SMALL -Color $C_TEXTDIM
+$modeGroup.Controls.Add($script:lblModeDesc)
+
+$script:radioBasicMode.Add_CheckedChanged({
+    if ($script:radioBasicMode.Checked) {
+        $script:SetupMode = "basic"
+        $script:lblModeDesc.Text = "Quick setup -- port, shared secret, and PIN. Uses sensible defaults."
+        Rebuild-Sidebar
+    }
+})
+$script:radioAdvancedMode.Add_CheckedChanged({
+    if ($script:radioAdvancedMode.Checked) {
+        $script:SetupMode = "advanced"
+        $script:lblModeDesc.Text = "Full control over TLS, services, rate limiting, and all options."
+        Rebuild-Sidebar
+    }
+})
+
+$p0.Controls.Add((New-StyledLabel -Text "Project root: $ProjectRoot" -X 20 -Y 446 -Width 460 -Height 20 -Font $F_SMALL -Color $C_TEXTDIM))
+$panels[0] = $p0
 
 # ---------------------------------------------------------------------------
 # STEP 1: Role Selection
@@ -636,7 +700,7 @@ $pWorkerCfg.Controls.Add($script:cbKeepAwakeWorker)
 
 $p2.Controls.Add($pWorkerCfg)
 
-$panels += $p2
+$panels[1] = $p2
 
 # ---------------------------------------------------------------------------
 # STEP 3: TLS Configuration
@@ -728,7 +792,7 @@ $script:cbEnableTLS.Add_CheckedChanged({ $pTlsOptions.Visible = $script:cbEnable
 $script:rbExistingCerts.Add_CheckedChanged({ $pCertFields.Visible = $script:rbExistingCerts.Checked })
 $script:rbSelfSigned.Add_CheckedChanged({ $pCertFields.Visible = -not $script:rbSelfSigned.Checked })
 
-$panels += $p3
+$panels[2] = $p3
 
 # ---------------------------------------------------------------------------
 # STEP 4: Windows Service
@@ -781,7 +845,7 @@ $script:cbInstallService.Add_CheckedChanged({ $pSvcOptions.Visible = $script:cbI
 $p4.Controls.Add((New-StyledLabel -Text "You can also run manually with 'npm run relay' or 'npm run worker'." `
     -X 20 -Y 320 -Width 460 -Height 22 -Font $F_NORMAL -Color $C_TEXTDIM))
 
-$panels += $p4
+$panels[3] = $p4
 
 # ---------------------------------------------------------------------------
 # STEP 5: Review
@@ -806,7 +870,7 @@ $script:txtReview.ForeColor = $C_TEXT
 $script:txtReview.BorderStyle = "FixedSingle"
 $p5.Controls.Add($script:txtReview)
 
-$panels += $p5
+$panels[4] = $p5
 
 # ---------------------------------------------------------------------------
 # STEP 6: Installation Progress
@@ -837,7 +901,7 @@ $script:txtInstallLog.ForeColor = $C_TEXT
 $script:txtInstallLog.BorderStyle = "FixedSingle"
 $p6.Controls.Add($script:txtInstallLog)
 
-$panels += $p6
+$panels[5] = $p6
 
 # ---------------------------------------------------------------------------
 # STEP 7: Complete
@@ -886,12 +950,66 @@ $btnViewLogs.Add_Click({
 })
 $p7.Controls.Add($btnViewLogs)
 
-$panels += $p7
+$panels[6] = $p7
+
+# ---------------------------------------------------------------------------
+# STEP 10: Basic Config (basic mode)
+# ---------------------------------------------------------------------------
+$p10 = New-Object System.Windows.Forms.Panel
+$p10.Dock = "Fill"
+$p10.BackColor = $C_BG
+
+$p10.Controls.Add((New-StyledLabel -Text "Basic Configuration" -X 20 -Y 14 -Width 460 -Height 30 -Font $F_TITLE))
+
+$yB = 52
+
+# Port
+$p10.Controls.Add((New-StyledLabel -Text "Relay Port:" -X 20 -Y $yB -Width 120 -Height 22))
+$script:txtBasicPort = New-StyledTextBox -X 150 -Y ($yB - 2) -Width 80 -Text "7070"
+$p10.Controls.Add($script:txtBasicPort)
+$p10.Controls.Add((New-StyledLabel -Text "Port the relay listens on (1024-65535)" -X 240 -Y $yB -Width 250 -Height 22 -Font $F_SMALL -Color $C_TEXTDIM))
+$yB += 38
+
+# Shared Secret
+$p10.Controls.Add((New-StyledLabel -Text "Shared Secret:" -X 20 -Y $yB -Width 120 -Height 22))
+$script:txtBasicSecret = New-StyledTextBox -X 150 -Y ($yB - 2) -Width 220 -Text (New-SharedSecret)
+$p10.Controls.Add($script:txtBasicSecret)
+
+$btnGenBasicSecret = New-StyledButton -Text "Generate" -X 376 -Y ($yB - 3) -Width 70 -Height 26
+$btnGenBasicSecret.Font = $F_SMALL
+$btnGenBasicSecret.Add_Click({ $script:txtBasicSecret.Text = New-SharedSecret })
+$p10.Controls.Add($btnGenBasicSecret)
+
+$btnCopyBasicSecret = New-StyledButton -Text "Copy" -X 450 -Y ($yB - 3) -Width 50 -Height 26
+$btnCopyBasicSecret.Font = $F_SMALL
+$btnCopyBasicSecret.Add_Click({
+    [System.Windows.Forms.Clipboard]::SetText($script:txtBasicSecret.Text)
+})
+$p10.Controls.Add($btnCopyBasicSecret)
+$yB += 22
+$p10.Controls.Add((New-StyledLabel -Text "Auth token for API and agent connections. Agents must use the same secret." -X 150 -Y $yB -Width 340 -Height 18 -Font $F_SMALL -Color $C_TEXTDIM))
+$yB += 28
+
+# PIN
+$p10.Controls.Add((New-StyledLabel -Text "PIN Code:" -X 20 -Y $yB -Width 120 -Height 22))
+$script:txtBasicPin = New-StyledTextBox -X 150 -Y ($yB - 2) -Width 100 -Text ""
+$p10.Controls.Add($script:txtBasicPin)
+$yB += 22
+$p10.Controls.Add((New-StyledLabel -Text "Second factor for task submission. 4-8 digits, leave blank to disable." -X 150 -Y $yB -Width 340 -Height 18 -Font $F_SMALL -Color $C_TEXTDIM))
+$yB += 32
+
+$p10.Controls.Add((New-StyledLabel -Text "Basic mode uses these defaults:" -X 20 -Y $yB -Width 460 -Height 22 -Font $F_NORMAL -Color $C_TEXTDIM))
+$yB += 26
+$p10.Controls.Add((New-StyledLabel -Text "  Auto-discovery: On     Task queue: On     Sleep prevention: On" -X 20 -Y $yB -Width 460 -Height 20 -Font $F_SMALL -Color $C_TEXTDIM))
+$yB += 20
+$p10.Controls.Add((New-StyledLabel -Text "  Rate limiting: On     Load balancing: least-busy     TLS: Off     Service: Off" -X 20 -Y $yB -Width 460 -Height 20 -Font $F_SMALL -Color $C_TEXTDIM))
+
+$panels[10] = $p10
 
 # ===================================================================
 # Add all panels to content area (all hidden initially)
 # ===================================================================
-foreach ($panel in $panels) {
+foreach ($panel in $panels.Values) {
     $panel.Visible = $false
     $contentArea.Controls.Add($panel)
 }
@@ -900,13 +1018,31 @@ foreach ($panel in $panels) {
 # NAVIGATION LOGIC
 # ===================================================================
 
+# Helper: get current step flow based on mode
+function Get-StepFlow {
+    if ($script:SetupMode -eq "basic") { return $script:BasicFlow }
+    return $script:AdvancedFlow
+}
+
+# Helper: get index within the current flow for a given panel index
+function Get-FlowIndex {
+    param([int]$PanelIndex)
+    $flow = Get-StepFlow
+    for ($i = 0; $i -lt $flow.Count; $i++) {
+        if ($flow[$i] -eq $PanelIndex) { return $i }
+    }
+    return -1
+}
+
 function Update-Sidebar {
+    $flowIdx = Get-FlowIndex $script:CurrentStep
     for ($i = 0; $i -lt $script:stepLabels.Count; $i++) {
-        if ($i -eq $script:CurrentStep) {
+        if (-not $script:stepLabels[$i].Visible) { continue }
+        if ($i -eq $flowIdx) {
             $script:stepLabels[$i].Font = $F_STEP_ACT
             $script:stepLabels[$i].ForeColor = $C_HIGHLIGHT
             $script:stepLabels[$i].BackColor = $C_ACCENT
-        } elseif ($i -lt $script:CurrentStep) {
+        } elseif ($i -lt $flowIdx) {
             $script:stepLabels[$i].Font = $F_STEP
             $script:stepLabels[$i].ForeColor = $C_SUCCESS
             $script:stepLabels[$i].BackColor = [System.Drawing.Color]::Transparent
@@ -921,25 +1057,44 @@ function Update-Sidebar {
 function Show-Step {
     param([int]$StepIndex)
 
-    # Hide all panels
-    foreach ($panel in $panels) { $panel.Visible = $false }
+    # Clear content area and show the requested panel
+    $contentArea.Controls.Clear()
+    if ($panels.ContainsKey($StepIndex)) {
+        $contentArea.Controls.Add($panels[$StepIndex])
+        $panels[$StepIndex].Visible = $true
+    }
 
-    # Show the requested panel
-    $panels[$StepIndex].Visible = $true
     $script:CurrentStep = $StepIndex
-
     Update-Sidebar
 
-    # Button visibility
-    $btnBack.Visible = ($StepIndex -gt 0 -and $StepIndex -lt 5)
-    $btnCancel.Visible = ($StepIndex -lt 5)
+    $flow = Get-StepFlow
+    $flowIdx = Get-FlowIndex $StepIndex
+    $isReview = ($StepIndex -eq 4)
+    $isInstalling = ($StepIndex -eq 5)
+    $isComplete = ($StepIndex -eq 6)
 
-    # Next button text
-    switch ($StepIndex) {
-        4 { $btnNext.Text = "Install"; $btnNext.BackColor = $C_HIGHLIGHT; $btnNext.Visible = $true }
-        5 { $btnNext.Visible = $false; $btnBack.Visible = $false; $btnCancel.Visible = $false }
-        6 { $btnNext.Text = "Finish"; $btnNext.BackColor = $C_HIGHLIGHT; $btnNext.Visible = $true; $btnBack.Visible = $false; $btnCancel.Visible = $false }
-        default { $btnNext.Text = "Next >"; $btnNext.BackColor = $C_ACCENT; $btnNext.Visible = $true }
+    # Navigation button visibility
+    $btnBack.Visible = ($flowIdx -gt 0) -and (-not $isInstalling) -and (-not $isComplete)
+    $btnCancel.Visible = (-not $isInstalling) -and (-not $isComplete)
+
+    if ($isReview) {
+        $btnNext.Text = "Install"
+        $btnNext.BackColor = $C_HIGHLIGHT
+        $btnNext.Visible = $true
+    } elseif ($isInstalling) {
+        $btnNext.Visible = $false
+        $btnBack.Visible = $false
+        $btnCancel.Visible = $false
+    } elseif ($isComplete) {
+        $btnNext.Text = "Finish"
+        $btnNext.BackColor = $C_HIGHLIGHT
+        $btnNext.Visible = $true
+        $btnBack.Visible = $false
+        $btnCancel.Visible = $false
+    } else {
+        $btnNext.Text = "Next >"
+        $btnNext.BackColor = $C_ACCENT
+        $btnNext.Visible = $true
     }
 }
 
@@ -950,10 +1105,28 @@ function Build-ReviewText {
     [void]$sb.AppendLine("=== DISPATCH ORCHESTRATOR SETUP REVIEW ===")
     [void]$sb.AppendLine("")
     [void]$sb.AppendLine("Role:          ORCHESTRATOR")
+    [void]$sb.AppendLine("Mode:          $(if ($script:SetupMode -eq 'basic') { 'Basic' } else { 'Advanced' })")
     [void]$sb.AppendLine("Project Root:  $ProjectRoot")
     [void]$sb.AppendLine("")
 
-    if ($role -eq "coordinator") {
+    if ($script:SetupMode -eq "basic") {
+        [void]$sb.AppendLine("--- Orchestrator Settings (Basic) ---")
+        [void]$sb.AppendLine("Port:              $($script:txtBasicPort.Text)")
+        [void]$sb.AppendLine("Shared Secret:     $($script:txtBasicSecret.Text.Substring(0, [Math]::Min(16, $script:txtBasicSecret.Text.Length)))...")
+        $pinDisplay = if ($script:txtBasicPin.Text.Length -gt 0) { $script:txtBasicPin.Text } else { "(disabled)" }
+        [void]$sb.AppendLine("PIN Code:          $pinDisplay")
+        [void]$sb.AppendLine("Auto-discovery:    True")
+        [void]$sb.AppendLine("Task Queue:        True")
+        [void]$sb.AppendLine("Sleep Prevention:  True")
+        [void]$sb.AppendLine("Rate Limiting:     True")
+        [void]$sb.AppendLine("Load Balancing:    least-busy")
+        [void]$sb.AppendLine("")
+        [void]$sb.AppendLine("--- TLS ---")
+        [void]$sb.AppendLine("TLS:               Disabled")
+        [void]$sb.AppendLine("")
+        [void]$sb.AppendLine("--- Windows Service ---")
+        [void]$sb.AppendLine("Service:           Not installing")
+    } elseif ($role -eq "coordinator") {
         [void]$sb.AppendLine("--- Orchestrator Settings ---")
         [void]$sb.AppendLine("Port:              $($script:txtPort.Text)")
         [void]$sb.AppendLine("Shared Secret:     $($script:txtSecretCoord.Text.Substring(0, [Math]::Min(16, $script:txtSecretCoord.Text.Length)))...")
@@ -964,6 +1137,30 @@ function Build-ReviewText {
         [void]$sb.AppendLine("Sleep Prevention:  $($script:cbKeepAwakeCoord.Checked)")
         [void]$sb.AppendLine("Rate Limiting:     $($script:cbRateLimit.Checked)")
         [void]$sb.AppendLine("Load Balancing:    $($script:cmbLB.SelectedItem)")
+
+        [void]$sb.AppendLine("")
+        [void]$sb.AppendLine("--- TLS ---")
+        if ($script:cbEnableTLS.Checked) {
+            if ($script:rbSelfSigned.Checked) {
+                [void]$sb.AppendLine("TLS:               Enabled (self-signed, will generate)")
+            } else {
+                [void]$sb.AppendLine("TLS:               Enabled (existing certificates)")
+                [void]$sb.AppendLine("  Cert:            $($script:txtCertFile.Text)")
+                [void]$sb.AppendLine("  Key:             $($script:txtKeyFile.Text)")
+                [void]$sb.AppendLine("  CA:              $($script:txtCaFile.Text)")
+            }
+        } else {
+            [void]$sb.AppendLine("TLS:               Disabled")
+        }
+
+        [void]$sb.AppendLine("")
+        [void]$sb.AppendLine("--- Windows Service ---")
+        if ($script:cbInstallService.Checked) {
+            [void]$sb.AppendLine("Service:           $($script:txtServiceName.Text)")
+            [void]$sb.AppendLine("Auto-start:        $($script:cbAutoStart.Checked)")
+        } else {
+            [void]$sb.AppendLine("Service:           Not installing")
+        }
     } else {
         [void]$sb.AppendLine("--- Worker Settings ---")
         [void]$sb.AppendLine("Agent Name:        $($script:txtAgentName.Text)")
@@ -976,30 +1173,30 @@ function Build-ReviewText {
         [void]$sb.AppendLine("Allowed Dirs:      $($script:txtAllowedDirs.Text.Replace("`r`n", ", "))")
         [void]$sb.AppendLine("Auto-discovery:    $($script:cbWorkerDiscovery.Checked)")
         [void]$sb.AppendLine("Sleep Prevention:  $($script:cbKeepAwakeWorker.Checked)")
-    }
 
-    [void]$sb.AppendLine("")
-    [void]$sb.AppendLine("--- TLS ---")
-    if ($script:cbEnableTLS.Checked) {
-        if ($script:rbSelfSigned.Checked) {
-            [void]$sb.AppendLine("TLS:               Enabled (self-signed, will generate)")
+        [void]$sb.AppendLine("")
+        [void]$sb.AppendLine("--- TLS ---")
+        if ($script:cbEnableTLS.Checked) {
+            if ($script:rbSelfSigned.Checked) {
+                [void]$sb.AppendLine("TLS:               Enabled (self-signed, will generate)")
+            } else {
+                [void]$sb.AppendLine("TLS:               Enabled (existing certificates)")
+                [void]$sb.AppendLine("  Cert:            $($script:txtCertFile.Text)")
+                [void]$sb.AppendLine("  Key:             $($script:txtKeyFile.Text)")
+                [void]$sb.AppendLine("  CA:              $($script:txtCaFile.Text)")
+            }
         } else {
-            [void]$sb.AppendLine("TLS:               Enabled (existing certificates)")
-            [void]$sb.AppendLine("  Cert:            $($script:txtCertFile.Text)")
-            [void]$sb.AppendLine("  Key:             $($script:txtKeyFile.Text)")
-            [void]$sb.AppendLine("  CA:              $($script:txtCaFile.Text)")
+            [void]$sb.AppendLine("TLS:               Disabled")
         }
-    } else {
-        [void]$sb.AppendLine("TLS:               Disabled")
-    }
 
-    [void]$sb.AppendLine("")
-    [void]$sb.AppendLine("--- Windows Service ---")
-    if ($script:cbInstallService.Checked) {
-        [void]$sb.AppendLine("Service:           $($script:txtServiceName.Text)")
-        [void]$sb.AppendLine("Auto-start:        $($script:cbAutoStart.Checked)")
-    } else {
-        [void]$sb.AppendLine("Service:           Not installing")
+        [void]$sb.AppendLine("")
+        [void]$sb.AppendLine("--- Windows Service ---")
+        if ($script:cbInstallService.Checked) {
+            [void]$sb.AppendLine("Service:           $($script:txtServiceName.Text)")
+            [void]$sb.AppendLine("Auto-start:        $($script:cbAutoStart.Checked)")
+        } else {
+            [void]$sb.AppendLine("Service:           Not installing")
+        }
     }
 
     [void]$sb.AppendLine("")
@@ -1009,13 +1206,13 @@ function Build-ReviewText {
     } else {
         [void]$sb.AppendLine("  WRITE  worker/worker-config.json")
     }
-    if ($script:cbEnableTLS.Checked -and $script:rbSelfSigned.Checked) {
+    if ($script:SetupMode -eq "advanced" -and $script:cbEnableTLS.Checked -and $script:rbSelfSigned.Checked) {
         [void]$sb.AppendLine("  CREATE certs/ca.crt, ca.key")
         [void]$sb.AppendLine("  CREATE certs/server.crt, server.key")
         [void]$sb.AppendLine("  CREATE certs/client.crt, client.key")
     }
     [void]$sb.AppendLine("  RUN    npm install (if needed)")
-    if ($script:cbInstallService.Checked) {
+    if ($script:SetupMode -eq "advanced" -and $script:cbInstallService.Checked) {
         [void]$sb.AppendLine("  RUN    nssm install $($script:txtServiceName.Text)")
     }
 
@@ -1028,7 +1225,66 @@ function Build-ReviewText {
 
 function Build-ConfigJson {
     $role = $script:SelectedRole
-    if ($role -eq "coordinator") {
+    if ($script:SetupMode -eq "basic" -and $role -eq "coordinator") {
+        # Basic mode — use fields from the basic config panel, defaults for the rest
+        $port = [int]$script:txtBasicPort.Text
+        $secret = $script:txtBasicSecret.Text
+        $pinEnabled = $script:txtBasicPin.Text.Length -gt 0
+        $pinCode = if ($pinEnabled) { $script:txtBasicPin.Text } else { "" }
+
+        $config = [ordered]@{
+            port = $port
+            sharedSecret = $secret
+            machines = @(
+                [ordered]@{
+                    machineId = "machine-2"
+                    description = "Worker machine 2"
+                    defaultWorkingDir = "C:/workspace"
+                }
+            )
+            tls = [ordered]@{
+                enabled = $false
+                certFile = "../certs/server.crt"
+                keyFile = "../certs/server.key"
+                caFile = "../certs/ca.crt"
+            }
+            discovery = [ordered]@{
+                enabled = $true
+                broadcastPort = 7071
+                intervalMs = 5000
+            }
+            heartbeat = [ordered]@{
+                intervalMs = 30000
+                timeoutMs = 10000
+            }
+            loadBalancing = [ordered]@{
+                strategy = "least-busy"
+            }
+            rateLimiting = [ordered]@{
+                enabled = $true
+                maxTasksPerMinute = 10
+                maxTasksPerHour = 100
+            }
+            limits = [ordered]@{
+                maxPromptLength = 50000
+                maxOutputLength = 1000000
+                maxRequestBodyBytes = 102400
+            }
+            keepAwake = [ordered]@{
+                enabled = $true
+            }
+            queue = [ordered]@{
+                enabled = $true
+                maxQueueSize = 100
+            }
+            pin = [ordered]@{
+                enabled = $pinEnabled
+                code = $pinCode
+                maxAttempts = 5
+                lockoutMinutes = 15
+            }
+        }
+    } elseif ($role -eq "coordinator") {
         $port = [int]$script:txtPort.Text
         $secret = $script:txtSecretCoord.Text
         $pinEnabled = $script:txtPinCode.Text.Length -gt 0
@@ -1171,8 +1427,10 @@ function Run-Installation {
     $script:txtInstallLog.Text = ""
     $role = $script:SelectedRole
     $totalSteps = 5
-    if ($script:cbEnableTLS.Checked -and $script:rbSelfSigned.Checked) { $totalSteps++ }
-    if ($script:cbInstallService.Checked) { $totalSteps++ }
+    $doTls = ($script:SetupMode -eq "advanced") -and $script:cbEnableTLS.Checked -and $script:rbSelfSigned.Checked
+    $doService = ($script:SetupMode -eq "advanced") -and $script:cbInstallService.Checked
+    if ($doTls) { $totalSteps++ }
+    if ($doService) { $totalSteps++ }
     $script:_installStepNum = 0
     $script:_installTotalSteps = $totalSteps
 
@@ -1247,7 +1505,7 @@ function Run-Installation {
     & $advanceProgress
 
     # --- Step: TLS certs ---
-    if ($script:cbEnableTLS.Checked -and $script:rbSelfSigned.Checked) {
+    if ($doTls) {
         Write-InstallLog "Generating TLS certificates..." "INFO"
         [System.Windows.Forms.Application]::DoEvents()
         $certScript = Join-Path (Join-Path $ProjectRoot "install") "generate-certs.ps1"
@@ -1270,7 +1528,11 @@ function Run-Installation {
     }
 
     # --- Step: Kill any existing process on the relay port ---
-    $port = if ($role -eq "coordinator") { [int]$script:txtPort.Text } else { $null }
+    $port = if ($role -eq "coordinator" -and $script:SetupMode -eq "basic") {
+        [int]$script:txtBasicPort.Text
+    } elseif ($role -eq "coordinator") {
+        [int]$script:txtPort.Text
+    } else { $null }
     if ($port) {
         $existing = netstat -ano 2>$null | Select-String ":$port\s+.*LISTENING\s+(\d+)" |
             ForEach-Object { $_.Matches[0].Groups[1].Value } | Select-Object -Unique
@@ -1282,7 +1544,7 @@ function Run-Installation {
     }
 
     # --- Step: Windows service ---
-    if ($script:cbInstallService.Checked) {
+    if ($doService) {
         $svcName = $script:txtServiceName.Text
         Write-InstallLog "Installing Windows service '$svcName'..." "INFO"
         [System.Windows.Forms.Application]::DoEvents()
@@ -1426,8 +1688,26 @@ function Validate-Step {
         $pWorkerCfg.Visible = $false
         $script:txtServiceName.Text = "DispatchRelay"
     }
+    elseif ($StepIndex -eq 10) {
+        # Basic config validation
+        $port = 0
+        if (-not [int]::TryParse($script:txtBasicPort.Text, [ref]$port) -or $port -lt 1024 -or $port -gt 65535) {
+            [void][System.Windows.Forms.MessageBox]::Show("Port must be a number between 1024 and 65535.", "Validation", "OK", "Warning")
+            return $false
+        }
+        if ($script:txtBasicSecret.Text.Trim().Length -lt 8) {
+            [void][System.Windows.Forms.MessageBox]::Show("Shared secret must be at least 8 characters.", "Validation", "OK", "Warning")
+            return $false
+        }
+        if ($script:txtBasicPin.Text.Length -gt 0) {
+            if ($script:txtBasicPin.Text -notmatch '^\d{4,8}$') {
+                [void][System.Windows.Forms.MessageBox]::Show("PIN must be 4-8 digits (or leave blank to disable).", "Validation", "OK", "Warning")
+                return $false
+            }
+        }
+    }
     elseif ($StepIndex -eq 1) {
-        # Configuration validation (coordinator)
+        # Configuration validation (coordinator, advanced)
         $port = 0
         if (-not [int]::TryParse($script:txtPort.Text, [ref]$port) -or $port -lt 1024 -or $port -gt 65535) {
             [void][System.Windows.Forms.MessageBox]::Show("Port must be a number between 1024 and 65535.", "Validation", "OK", "Warning")
@@ -1471,12 +1751,15 @@ function Validate-Step {
 
 $btnNext.Add_Click({
     $step = $script:CurrentStep
+    $flow = Get-StepFlow
+    $flowIdx = Get-FlowIndex $step
 
     # Validate current step before proceeding
     if (-not (Validate-Step $step)) { return }
 
     if ($step -eq 4) {
-        # Install step (Review -> Installing)
+        # Review -> Installing: populate review, then install
+        $script:txtReview.Text = Build-ReviewText
         Show-Step 5
         [System.Windows.Forms.Application]::DoEvents()
         $success = Run-Installation
@@ -1488,11 +1771,11 @@ $btnNext.Add_Click({
             $script:lblCompleteTitle.ForeColor = $C_SUCCESS
 
             if ($role -eq "coordinator") {
-                $port = $script:txtPort.Text
-                $proto = if ($script:cbEnableTLS.Checked) { "https" } else { "http" }
-                $secret = $script:txtSecretCoord.Text
+                $port = if ($script:SetupMode -eq "basic") { $script:txtBasicPort.Text } else { $script:txtPort.Text }
+                $proto = if ($script:SetupMode -eq "advanced" -and $script:cbEnableTLS.Checked) { "https" } else { "http" }
+                $secret = if ($script:SetupMode -eq "basic") { $script:txtBasicSecret.Text } else { $script:txtSecretCoord.Text }
                 $secretHint = $secret.Substring(0, [Math]::Min(4, $secret.Length)) + "...." + $secret.Substring([Math]::Max(0, $secret.Length - 4))
-                $svcInstalled = $script:cbInstallService.Checked
+                $svcInstalled = ($script:SetupMode -eq "advanced") -and $script:cbInstallService.Checked
                 $script:lblCompleteSummary.Text = "Your machine has been configured as the Orchestrator.`nThe relay server is configured on port $port.`nShared secret has been set in relay/config.json."
                 if ($svcInstalled) {
                     $script:txtWhatsNext.Text = "What's next:`n`n" +
@@ -1517,7 +1800,7 @@ $btnNext.Add_Click({
                 $coordHost = $script:txtCoordHost.Text
                 $secret = $script:txtSecretWorker.Text
                 $secretHint = $secret.Substring(0, [Math]::Min(4, $secret.Length)) + "...." + $secret.Substring([Math]::Max(0, $secret.Length - 4))
-                $svcInstalled = $script:cbInstallService.Checked
+                $svcInstalled = ($script:SetupMode -eq "advanced") -and $script:cbInstallService.Checked
                 $script:lblCompleteSummary.Text = "Your machine has been configured as Worker '$agentName'.`nCoordinator: $coordHost`nConfiguration saved to worker/worker-config.json."
                 if ($svcInstalled) {
                     $script:txtWhatsNext.Text = "What's next:`n`n" +
@@ -1555,8 +1838,8 @@ $btnNext.Add_Click({
     if ($step -eq 6) {
         # Finish — launch relay + dashboard if checkbox is checked
         if ($script:cbStartRelay -and $script:cbStartRelay.Checked) {
-            $port = if ($script:SelectedRole -eq "coordinator") { $script:txtPort.Text } else { "7070" }
-            $proto = if ($script:cbEnableTLS.Checked) { "https" } else { "http" }
+            $port = if ($script:SetupMode -eq "basic") { $script:txtBasicPort.Text } elseif ($script:SelectedRole -eq "coordinator") { $script:txtPort.Text } else { "7070" }
+            $proto = if ($script:SetupMode -eq "advanced" -and $script:cbEnableTLS.Checked) { "https" } else { "http" }
 
             # Kill any existing process on the relay port
             try {
@@ -1571,7 +1854,7 @@ $btnNext.Add_Click({
             Start-Process cmd.exe -ArgumentList $cmdArgs -WorkingDirectory $ProjectRoot -WindowStyle Minimized
             Start-Sleep -Seconds 3
             # Pass the shared secret as a URL param so the dashboard auto-configures
-            $secret = $script:txtSecretCoord.Text
+            $secret = if ($script:SetupMode -eq "basic") { $script:txtBasicSecret.Text } else { $script:txtSecretCoord.Text }
             $encodedSecret = [System.Uri]::EscapeDataString($secret)
             Start-Process "$proto`://localhost:$port/dashboard?token=$encodedSecret"
         }
@@ -1579,18 +1862,24 @@ $btnNext.Add_Click({
         return
     }
 
-    # Populate review before showing Review step
-    if ($step -eq 3) {
+    # Populate review before showing Review step (the step before review in the flow)
+    $nextFlowIdx = $flowIdx + 1
+    if ($nextFlowIdx -lt $flow.Count -and $flow[$nextFlowIdx] -eq 4) {
         $script:txtReview.Text = Build-ReviewText
     }
 
-    Show-Step ($step + 1)
+    # Move to next step in the flow
+    if ($flowIdx -ge 0 -and $flowIdx -lt ($flow.Count - 1)) {
+        Show-Step $flow[$flowIdx + 1]
+    }
 })
 
 $btnBack.Add_Click({
     $step = $script:CurrentStep
-    if ($step -gt 0) {
-        Show-Step ($step - 1)
+    $flow = Get-StepFlow
+    $flowIdx = Get-FlowIndex $step
+    if ($flowIdx -gt 0) {
+        Show-Step $flow[$flowIdx - 1]
     }
 })
 
