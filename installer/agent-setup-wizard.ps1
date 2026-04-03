@@ -408,29 +408,52 @@ $script:btnTest.Add_Click({
     $script:lblTestResult.ForeColor = $ColorLightGray
     $form.Refresh()
 
+    # Require shared secret for both modes
+    $secret = $script:txtSecret.Text.Trim()
+    if ($secret -eq "") {
+        $script:lblTestResult.Text = "Enter shared secret first"
+        $script:lblTestResult.ForeColor = $ColorRed
+        return
+    }
+
     if ($script:radioAuto.Checked) {
-        # Try UDP discovery for ~10 seconds
-        $script:lblTestResult.Text = "Listening for UDP broadcast (10s)..."
+        # Try UDP discovery for ~10 seconds, verifying HMAC signature
+        $script:lblTestResult.Text = "Listening for broadcast (10s)..."
         $form.Refresh()
         try {
+            $escapedSecret = $secret -replace "'", "''"
             $udpResult = & powershell -NoProfile -Command @"
+`$secret = '$escapedSecret'
 `$socket = New-Object System.Net.Sockets.UdpClient(7071)
 `$socket.Client.ReceiveTimeout = 10000
 try {
     `$ep = New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Any, 0)
     `$data = `$socket.Receive([ref]`$ep)
     `$msg = [System.Text.Encoding]::UTF8.GetString(`$data)
-    Write-Output "OK:`$msg from `$(`$ep.Address)"
+    `$envelope = `$msg | ConvertFrom-Json
+    if (`$envelope.payload -and `$envelope.ts -and `$envelope.hmac) {
+        `$hmac = New-Object System.Security.Cryptography.HMACSHA256
+        `$hmac.Key = [System.Text.Encoding]::UTF8.GetBytes(`$secret)
+        `$computed = [BitConverter]::ToString(`$hmac.ComputeHash([System.Text.Encoding]::UTF8.GetBytes(`$envelope.ts + `$envelope.payload))).Replace('-','').ToLower()
+        if (`$computed -eq `$envelope.hmac) {
+            `$payload = `$envelope.payload | ConvertFrom-Json
+            Write-Output "OK:`$(`$payload.host):`$(`$payload.port)"
+        } else {
+            Write-Output "FAIL:Wrong shared secret (HMAC mismatch)"
+        }
+    } else {
+        Write-Output "FAIL:Unsigned broadcast (old relay version?)"
+    }
 } catch {
     Write-Output "FAIL:No broadcast received within 10 seconds"
 } finally {
     `$socket.Close()
 }
 "@
-            # Flatten array output to a single string
             $udpStr = if ($udpResult -is [array]) { $udpResult -join "" } else { "$udpResult" }
             if ($udpStr -like "OK:*") {
-                $script:lblTestResult.Text = "OK! Relay found"
+                $relay = $udpStr -replace "^OK:", ""
+                $script:lblTestResult.Text = "OK! Relay at $relay"
                 $script:lblTestResult.ForeColor = $ColorGreen
             } else {
                 $msg = $udpStr -replace "^FAIL:", ""

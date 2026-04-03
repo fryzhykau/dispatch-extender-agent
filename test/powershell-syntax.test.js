@@ -231,4 +231,38 @@ describe('JavaScript security checks', () => {
     const content = readFileSync(join(projectRoot, 'worker', 'discovery.js'), 'utf-8');
     assert.ok(content.includes('timingSafeEqual'), 'Worker discovery should verify HMAC with timing-safe comparison');
   });
+
+  it('agent wizard Test Connection should require shared secret', () => {
+    const content = readFileSync(join(projectRoot, 'installer', 'agent-setup-wizard.ps1'), 'utf-8');
+    assert.ok(content.includes('Enter shared secret first'),
+      'Test Connection should check for empty secret before testing');
+  });
+
+  it('agent wizard Test Connection should verify HMAC on UDP discovery', () => {
+    const content = readFileSync(join(projectRoot, 'installer', 'agent-setup-wizard.ps1'), 'utf-8');
+    assert.ok(content.includes('HMACSHA256'),
+      'Auto-discovery test should verify HMAC signature');
+    assert.ok(content.includes('HMAC mismatch'),
+      'Auto-discovery test should report HMAC mismatch on wrong secret');
+  });
+
+  it('agent wizard should write config without UTF-8 BOM', () => {
+    const content = readFileSync(join(projectRoot, 'installer', 'agent-setup-wizard.ps1'), 'utf-8');
+    assert.ok(content.includes('UTF8Encoding $false'),
+      'Config should be written with UTF8Encoding($false) to avoid BOM');
+  });
+
+  it('orchestrator wizard should pass auth token to dashboard URL', () => {
+    const content = readFileSync(join(projectRoot, 'install', 'setup-wizard.ps1'), 'utf-8');
+    assert.ok(content.includes('token=$encodedSecret'),
+      'Dashboard URL should include token parameter for auto-auth');
+  });
+
+  it('dashboard should auto-import token from URL parameter', () => {
+    const content = readFileSync(join(projectRoot, 'dashboard', 'index.html'), 'utf-8');
+    assert.ok(content.includes("urlParams.get('token')"),
+      'Dashboard should read token from URL parameter');
+    assert.ok(content.includes('replaceState'),
+      'Dashboard should strip token from URL after importing');
+  });
 });
