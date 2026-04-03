@@ -13,20 +13,35 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Global error trap — log crash details to ProgramData for diagnostics
+trap {
+    $crashLog = Join-Path (Join-Path $env:ProgramData "DispatchAgent") "logs\wizard-crash.log"
+    $crashDir = Split-Path $crashLog
+    if (-not (Test-Path $crashDir)) { New-Item -ItemType Directory -Path $crashDir -Force | Out-Null }
+    "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') CRASH: $($_.Exception.Message)`n$($_.ScriptStackTrace)" | Out-File $crashLog -Encoding UTF8 -Force
+    Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
+    [void][System.Windows.Forms.MessageBox]::Show("Agent wizard crashed:`n`n$($_.Exception.Message)`n`nSee: $crashLog", "Dispatch Agent", 0, 16)
+    exit 1
+}
+
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 # Enable DPI awareness for crisp rendering on high-DPI displays.
 # SetProcessDPIAware tells Windows not to bitmap-scale the window.
 # All control layouts are designed at 96 DPI; we scale them by $DpiScale.
-Add-Type -TypeDefinition @"
+try {
+    Add-Type -TypeDefinition @"
 using System.Runtime.InteropServices;
-public class DpiHelper {
+public class AgentDpiHelper {
     [DllImport("user32.dll")]
     public static extern bool SetProcessDPIAware();
 }
 "@
-[DpiHelper]::SetProcessDPIAware() | Out-Null
+    [AgentDpiHelper]::SetProcessDPIAware() | Out-Null
+} catch {
+    # Already loaded or unavailable — continue without DPI awareness
+}
 
 [System.Windows.Forms.Application]::EnableVisualStyles()
 [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false)

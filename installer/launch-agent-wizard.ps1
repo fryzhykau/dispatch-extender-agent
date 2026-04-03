@@ -41,12 +41,11 @@ try {
         Add-Type -AssemblyName System.Windows.Forms
         [void][System.Windows.Forms.MessageBox]::Show(
             "Setup wizard not found.`n`nExpected: $WizardScript`nSee log: $LogFile",
-            "Dispatch Agent", 0, 48) | Out-Null
+            "Dispatch Agent", 0, 48)
         exit 1
     }
 
-    # Launch the wizard directly (it contains its own WinForms GUI)
-    # Do not pipe output — the wizard needs foreground access for its WinForms window
+    # Launch the wizard directly — do not pipe (WinForms needs foreground)
     & $WizardScript
 
     $exitCode = $LASTEXITCODE
@@ -59,6 +58,6 @@ catch {
     Add-Type -AssemblyName System.Windows.Forms
     [void][System.Windows.Forms.MessageBox]::Show(
         "Setup wizard failed to launch.`n`n$($_.Exception.Message)`n`nSee log: $LogFile",
-        "Dispatch Agent", 0, 48) | Out-Null
+        "Dispatch Agent", 0, 48)
     exit 1
 }

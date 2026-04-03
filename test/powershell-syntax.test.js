@@ -146,7 +146,19 @@ describe('PowerShell static analysis', () => {
         `Set-Content -Encoding UTF8 writes BOM which breaks JSON.parse.\nUse [System.IO.File]::WriteAllText with UTF8Encoding($false):\n${issues.join('\n')}`);
     });
 
-    // --- F. return inside switch (exits switch, not function) ---
+    // --- F. [void] combined with | Out-Null (crashes with "Argument type cannot be System.Void") ---
+    it(`${relPath} should not combine [void] with | Out-Null`, () => {
+      const issues = [];
+      lines.forEach((line, i) => {
+        if (/\[void\].*\|\s*Out-Null/.test(line)) {
+          issues.push(`  Line ${i + 1}: ${line.trim().substring(0, 80)}`);
+        }
+      });
+      assert.equal(issues.length, 0,
+        `[void] + | Out-Null crashes PS ("Argument type cannot be System.Void"):\n${issues.join('\n')}`);
+    });
+
+    // --- G. return inside switch (exits switch, not function) ---
     it(`${relPath} should not use return inside switch for validation`, () => {
       const issues = [];
       let inSwitch = 0;
