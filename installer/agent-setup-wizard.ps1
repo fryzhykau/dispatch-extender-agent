@@ -412,7 +412,7 @@ $p1.BackColor = $ColorDarkBg
 New-StyledLabel -Parent $p1 -Text "Agent Identity" -X 20 -Y 20 -Width 450 -Height 32 -Font $FontTitle -ForeColor $ColorHighlight | Out-Null
 
 New-StyledLabel -Parent $p1 -Text "Agent Name (required)" -X 20 -Y 70 -Width 300 -Height 20 -Font $FontLabel | Out-Null
-$script:txtAgentName = New-StyledTextBox -Parent $p1 -Text "" -X 20 -Y 94 -Width 280
+$script:txtAgentName = New-StyledTextBox -Parent $p1 -Text "agent-1" -X 20 -Y 94 -Width 280
 New-StyledLabel -Parent $p1 -Text "e.g., CodeBot, ResearchBot" -X 310 -Y 96 -Width 150 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
 New-StyledLabel -Parent $p1 -Text "Agent Description" -X 20 -Y 134 -Width 300 -Height 20 -Font $FontLabel | Out-Null
@@ -752,8 +752,8 @@ $p10.BackColor = $ColorDarkBg
 New-StyledLabel -Parent $p10 -Text "Agent Configuration" -X 20 -Y 14 -Width 450 -Height 32 -Font $FontTitle -ForeColor $ColorHighlight | Out-Null
 
 New-StyledLabel -Parent $p10 -Text "Agent Name (required)" -X 20 -Y 58 -Width 300 -Height 20 -Font $FontLabel | Out-Null
-$script:txtBasicAgentName = New-StyledTextBox -Parent $p10 -Text "" -X 20 -Y 80 -Width 280
-New-StyledLabel -Parent $p10 -Text "e.g., CodeBot, ResearchBot" -X 310 -Y 82 -Width 150 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+$script:txtBasicAgentName = New-StyledTextBox -Parent $p10 -Text "agent-1" -X 20 -Y 80 -Width 280
+New-StyledLabel -Parent $p10 -Text "e.g., agent-1, CodeBot, ResearchBot" -X 310 -Y 82 -Width 150 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
 New-StyledLabel -Parent $p10 -Text "Shared Secret (required)" -X 20 -Y 118 -Width 300 -Height 20 -Font $FontLabel | Out-Null
 $script:txtBasicSecret = New-StyledTextBox -Parent $p10 -Text "" -X 20 -Y 140 -Width 340
@@ -1106,6 +1106,28 @@ $json
 }
 
 # ---------------------------------------------------------------------------
+# Check if agent name is already registered with the relay
+# ---------------------------------------------------------------------------
+function Test-AgentNameExists {
+    param([string]$Name, [string]$Secret, [string]$RelayAddr)
+    if (-not $Secret -or -not $RelayAddr) { return $false }
+    try {
+        $addr = $RelayAddr -replace "^ws://", "http://" -replace "^wss://", "https://"
+        $headers = @{ "Authorization" = "Bearer $Secret" }
+        $response = Invoke-WebRequest -Uri "$addr/status" -Headers $headers -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop
+        $agents = $response.Content | ConvertFrom-Json
+        foreach ($a in $agents) {
+            if ($a.agentName -and $a.agentName.ToLower() -eq $Name.ToLower()) {
+                return $true
+            }
+        }
+    } catch {
+        # Can't reach relay — skip duplicate check
+    }
+    return $false
+}
+
+# ---------------------------------------------------------------------------
 # Validation per step
 # ---------------------------------------------------------------------------
 function Validate-Step {
@@ -1124,6 +1146,14 @@ function Validate-Step {
         if ($script:radioBasicManual.Checked -and $script:txtBasicCoordAddr.Text.Trim() -eq "") {
             [void][System.Windows.Forms.MessageBox]::Show("Orchestrator address is required for manual connection.", "Validation", "OK", "Warning")
             return $false
+        }
+        # Check for duplicate agent name
+        $relayAddr = if ($script:radioBasicManual.Checked) { $script:txtBasicCoordAddr.Text.Trim() } else { "ws://localhost:7070" }
+        if (Test-AgentNameExists -Name $script:txtBasicAgentName.Text.Trim() -Secret $script:txtBasicSecret.Text.Trim() -RelayAddr $relayAddr) {
+            $result = [System.Windows.Forms.MessageBox]::Show(
+                "An agent named '$($script:txtBasicAgentName.Text.Trim())' is already connected to the orchestrator.`n`nUse a different name?",
+                "Duplicate Agent Name", "YesNo", "Warning")
+            if ($result -eq "Yes") { return $false }
         }
     }
     elseif ($StepIndex -eq 1) {
@@ -1144,6 +1174,14 @@ function Validate-Step {
         if ($script:radioManual.Checked -and $script:txtCoordAddr.Text.Trim() -eq "") {
             [void][System.Windows.Forms.MessageBox]::Show("Orchestrator address is required for manual connection.", "Validation", "OK", "Warning")
             return $false
+        }
+        # Check for duplicate agent name
+        $relayAddr = if ($script:radioManual.Checked) { $script:txtCoordAddr.Text.Trim() } else { "ws://localhost:7070" }
+        if (Test-AgentNameExists -Name $script:txtAgentName.Text.Trim() -Secret $script:txtSecret.Text.Trim() -RelayAddr $relayAddr) {
+            $result = [System.Windows.Forms.MessageBox]::Show(
+                "An agent named '$($script:txtAgentName.Text.Trim())' is already connected to the orchestrator.`n`nUse a different name?",
+                "Duplicate Agent Name", "YesNo", "Warning")
+            if ($result -eq "Yes") { return $false }
         }
     }
     elseif ($StepIndex -eq 3) {
