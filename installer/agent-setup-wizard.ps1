@@ -96,6 +96,17 @@ $FontStepActive = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.
 # ---------------------------------------------------------------------------
 $script:CurrentStep = 0
 $script:TotalSteps  = 8  # 0-indexed: 0=Welcome,1=Identity,2=Connection,3=Dirs,4=Options,5=Review,6=Installing,7=Complete
+$script:SetupMode   = "basic"  # "basic" or "advanced"
+
+# Step flow sequences for each mode (panel indices)
+# Basic:    Welcome(0) -> BasicConfig(10) -> Review(5) -> Installing(6) -> Complete(7)
+# Advanced: Welcome(0) -> Identity(1) -> Connection(2) -> Dirs(3) -> Options(4) -> Review(5) -> Installing(6) -> Complete(7)
+$script:BasicFlow    = @(0, 10, 5, 6, 7)
+$script:AdvancedFlow = @(0, 1, 2, 3, 4, 5, 6, 7)
+
+$script:BasicSidebarNames    = @("Welcome", "Configuration", "Review", "Installing", "Complete")
+$script:AdvancedSidebarNames = @("Welcome", "Agent Identity", "Connection", "Directories", "Options", "Review", "Installing", "Complete")
+
 $script:Config = @{
     agentName          = ""
     agentDescription   = ""
@@ -254,17 +265,6 @@ function New-StyledRadio {
 # ---------------------------------------------------------------------------
 # Sidebar — step labels on the left
 # ---------------------------------------------------------------------------
-$StepNames = @(
-    "Welcome",
-    "Agent Identity",
-    "Connection",
-    "Directories",
-    "Options",
-    "Review",
-    "Installing",
-    "Complete"
-)
-
 $sidebar = New-Object System.Windows.Forms.Panel
 $sidebar.Location = New-Object System.Drawing.Point(0, 0)
 $sidebar.Size = New-Object System.Drawing.Size((S 190), (S 520))
@@ -272,11 +272,28 @@ $sidebar.BackColor = $ColorPanel
 
 $sideTitle = New-StyledLabel -Parent $sidebar -Text "Setup Steps" -X 14 -Y 14 -Width 170 -Height 28 -Font $FontLabel -ForeColor $ColorHighlight
 
+# Create max sidebar labels (8 slots) — rebuilt dynamically by Rebuild-Sidebar
 $script:stepLabels = @()
-for ($i = 0; $i -lt $StepNames.Count; $i++) {
-    $sl = New-StyledLabel -Parent $sidebar -Text "  $($i + 1). $($StepNames[$i])" -X 8 -Y (50 + $i * 28) -Width 174 -Height 24 -Font $FontStep -ForeColor $ColorDimGray
+for ($i = 0; $i -lt 8; $i++) {
+    $sl = New-StyledLabel -Parent $sidebar -Text "" -X 8 -Y (50 + $i * 28) -Width 174 -Height 24 -Font $FontStep -ForeColor $ColorDimGray
+    $sl.Visible = $false
     $script:stepLabels += $sl
 }
+
+function Rebuild-Sidebar {
+    $names = if ($script:SetupMode -eq "basic") { $script:BasicSidebarNames } else { $script:AdvancedSidebarNames }
+    for ($i = 0; $i -lt $script:stepLabels.Count; $i++) {
+        if ($i -lt $names.Count) {
+            $script:stepLabels[$i].Text = "  $($i + 1). $($names[$i])"
+            $script:stepLabels[$i].Visible = $true
+        } else {
+            $script:stepLabels[$i].Text = ""
+            $script:stepLabels[$i].Visible = $false
+        }
+    }
+}
+
+Rebuild-Sidebar
 
 $form.Controls.Add($sidebar)
 
@@ -355,8 +372,38 @@ if (Test-Path $diagramPath) {
 }
 
 New-StyledLabel -Parent $p0 -Text "Agents receive tasks from the orchestrator and run them`nusing Claude Code." -X 20 -Y 318 -Width 450 -Height 36 -Font $FontBody -ForeColor $ColorLightGray | Out-Null
-New-StyledLabel -Parent $p0 -Text "Click Next to begin configuration." -X 20 -Y 362 -Width 450 -Height 24 -Font $FontBody -ForeColor $ColorDimGray | Out-Null
-New-StyledLabel -Parent $p0 -Text "Project root: $ProjectRoot" -X 20 -Y 390 -Width 450 -Height 20 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+
+# Setup mode selection — group container to isolate radio buttons from step 2 radios
+$modeGroup = New-Object System.Windows.Forms.GroupBox
+$modeGroup.Location = New-Object System.Drawing.Point((S 20), (S 354))
+$modeGroup.Size = New-Object System.Drawing.Size((S 440), (S 50))
+$modeGroup.FlatStyle = "Flat"
+$modeGroup.ForeColor = $ColorDarkBg
+$modeGroup.BackColor = [System.Drawing.Color]::Transparent
+$modeGroup.Text = ""
+$p0.Controls.Add($modeGroup)
+
+$script:radioBasicMode = New-StyledRadio -Parent $modeGroup -Text "Basic Setup (recommended)" -X 0 -Y 0 -Width 200 -Checked $true
+$script:radioAdvancedMode = New-StyledRadio -Parent $modeGroup -Text "Advanced Setup" -X 210 -Y 0 -Width 200
+
+$script:lblModeDesc = New-StyledLabel -Parent $modeGroup -Text "Quick setup `u{2014} just agent name, shared secret, and connection. Uses sensible defaults." -X 0 -Y 22 -Width 440 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray
+
+$script:radioBasicMode.Add_CheckedChanged({
+    if ($script:radioBasicMode.Checked) {
+        $script:SetupMode = "basic"
+        $script:lblModeDesc.Text = "Quick setup `u{2014} just agent name, shared secret, and connection. Uses sensible defaults."
+        Rebuild-Sidebar
+    }
+})
+$script:radioAdvancedMode.Add_CheckedChanged({
+    if ($script:radioAdvancedMode.Checked) {
+        $script:SetupMode = "advanced"
+        $script:lblModeDesc.Text = "Full control over directories, TLS, services, and all options."
+        Rebuild-Sidebar
+    }
+})
+
+New-StyledLabel -Parent $p0 -Text "Project root: $ProjectRoot" -X 20 -Y 408 -Width 450 -Height 20 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
 $panels[0] = $p0
 
@@ -700,46 +747,223 @@ $script:chkStartAgent = New-StyledCheckBox -Parent $p7 -Text "Start the agent no
 
 $panels[7] = $p7
 
+# ========================== STEP 10: Basic Config (basic mode) ==============
+$p10 = New-Object System.Windows.Forms.Panel
+$p10.Size = $contentPanel.Size
+$p10.BackColor = $ColorDarkBg
+
+New-StyledLabel -Parent $p10 -Text "Agent Configuration" -X 20 -Y 14 -Width 450 -Height 32 -Font $FontTitle -ForeColor $ColorHighlight | Out-Null
+
+New-StyledLabel -Parent $p10 -Text "Agent Name (required)" -X 20 -Y 58 -Width 300 -Height 20 -Font $FontLabel | Out-Null
+$script:txtBasicAgentName = New-StyledTextBox -Parent $p10 -Text "" -X 20 -Y 80 -Width 280
+New-StyledLabel -Parent $p10 -Text "e.g., CodeBot, ResearchBot" -X 310 -Y 82 -Width 150 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+
+New-StyledLabel -Parent $p10 -Text "Shared Secret (required)" -X 20 -Y 118 -Width 300 -Height 20 -Font $FontLabel | Out-Null
+$script:txtBasicSecret = New-StyledTextBox -Parent $p10 -Text "" -X 20 -Y 140 -Width 340
+New-StyledLabel -Parent $p10 -Text "Get this from whoever set up the orchestrator" -X 20 -Y 168 -Width 400 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+
+New-StyledLabel -Parent $p10 -Text "Connection" -X 20 -Y 200 -Width 300 -Height 20 -Font $FontLabel | Out-Null
+
+# Group container to isolate radios from welcome page radios
+$basicConnGroup = New-Object System.Windows.Forms.GroupBox
+$basicConnGroup.Location = New-Object System.Drawing.Point((S 20), (S 218))
+$basicConnGroup.Size = New-Object System.Drawing.Size((S 440), (S 80))
+$basicConnGroup.FlatStyle = "Flat"
+$basicConnGroup.ForeColor = $ColorDarkBg
+$basicConnGroup.BackColor = [System.Drawing.Color]::Transparent
+$basicConnGroup.Text = ""
+$p10.Controls.Add($basicConnGroup)
+
+$script:radioBasicAuto = New-StyledRadio -Parent $basicConnGroup -Text "Auto-discover on local network (recommended)" -X 0 -Y 0 -Width 430 -Checked $true
+$script:radioBasicManual = New-StyledRadio -Parent $basicConnGroup -Text "Connect to specific address" -X 0 -Y 26 -Width 430
+
+$script:txtBasicCoordAddr = New-StyledTextBox -Parent $basicConnGroup -Text "ws://192.168.1.100:7070" -X 24 -Y 52 -Width 340
+$script:txtBasicCoordAddr.Enabled = $false
+
+$script:radioBasicAuto.Add_CheckedChanged({
+    if ($script:radioBasicAuto.Checked) {
+        $script:txtBasicCoordAddr.Enabled = $false
+    }
+})
+$script:radioBasicManual.Add_CheckedChanged({
+    if ($script:radioBasicManual.Checked) {
+        $script:txtBasicCoordAddr.Enabled = $true
+    }
+})
+
+$script:btnBasicTest = New-StyledButton -Parent $p10 -Text "Test Connection" -X 20 -Y 310 -Width 140 -Height 30 -BackColor $ColorAccent
+$script:lblBasicTestResult = New-StyledLabel -Parent $p10 -Text "" -X 20 -Y 346 -Width 440 -Height 40 -Font $FontBody -ForeColor $ColorLightGray
+
+$script:btnBasicTest.Add_Click({
+    $script:lblBasicTestResult.Text = ""
+    $script:lblBasicTestResult.ForeColor = $ColorLightGray
+    $form.Refresh()
+
+    $secret = $script:txtBasicSecret.Text.Trim()
+    if ($secret -eq "") {
+        $script:lblBasicTestResult.Text = "Please enter the shared secret first."
+        $script:lblBasicTestResult.ForeColor = $ColorRed
+        return
+    }
+
+    if ($script:radioBasicAuto.Checked) {
+        $script:lblBasicTestResult.Text = "Listening for orchestrator broadcast (10s)..."
+        $form.Refresh()
+        try {
+            $escapedSecret = $secret -replace "'", "''"
+            $udpResult = & powershell -NoProfile -Command @"
+`$secret = '$escapedSecret'
+`$socket = New-Object System.Net.Sockets.UdpClient(7071)
+`$socket.Client.ReceiveTimeout = 10000
+try {
+    `$ep = New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Any, 0)
+    `$data = `$socket.Receive([ref]`$ep)
+    `$msg = [System.Text.Encoding]::UTF8.GetString(`$data)
+    `$envelope = `$msg | ConvertFrom-Json
+    if (`$envelope.payload -and `$envelope.ts -and `$envelope.hmac) {
+        `$hmac = New-Object System.Security.Cryptography.HMACSHA256
+        `$hmac.Key = [System.Text.Encoding]::UTF8.GetBytes(`$secret)
+        `$computed = [BitConverter]::ToString(`$hmac.ComputeHash([System.Text.Encoding]::UTF8.GetBytes(`$envelope.ts + `$envelope.payload))).Replace('-','').ToLower()
+        if (`$computed -eq `$envelope.hmac) {
+            `$payload = `$envelope.payload | ConvertFrom-Json
+            Write-Output "OK:`$(`$payload.host):`$(`$payload.port)"
+        } else {
+            Write-Output "FAIL:Wrong shared secret (HMAC mismatch)"
+        }
+    } else {
+        Write-Output "FAIL:Unsigned broadcast (old relay version?)"
+    }
+} catch {
+    Write-Output "FAIL:No broadcast received within 10 seconds"
+} finally {
+    `$socket.Close()
+}
+"@
+            $udpStr = if ($udpResult -is [array]) { $udpResult -join "`n" } else { "$udpResult" }
+            $udpStr = $udpStr.Trim()
+            if ($udpStr -like "OK:*") {
+                $relay = $udpStr -replace "^OK:", ""
+                $script:lblBasicTestResult.Text = "Relay found at $relay"
+                $script:lblBasicTestResult.ForeColor = $ColorGreen
+            } elseif ($udpStr -match "HMAC mismatch") {
+                $script:lblBasicTestResult.Text = "Wrong shared secret. Check it matches the orchestrator."
+                $script:lblBasicTestResult.ForeColor = $ColorRed
+            } elseif ($udpStr -match "No broadcast") {
+                $script:lblBasicTestResult.Text = "No orchestrator found on your network.`nMake sure the relay is running and discovery is enabled."
+                $script:lblBasicTestResult.ForeColor = $ColorRed
+            } elseif ($udpStr -match "Unsigned") {
+                $script:lblBasicTestResult.Text = "Found a relay, but it's unsigned (older version?)."
+                $script:lblBasicTestResult.ForeColor = [System.Drawing.Color]::FromArgb(241, 196, 15)
+            } else {
+                $script:lblBasicTestResult.Text = "Failed: $udpStr"
+                $script:lblBasicTestResult.ForeColor = $ColorRed
+            }
+        } catch {
+            $script:lblBasicTestResult.Text = "Failed: $_"
+            $script:lblBasicTestResult.ForeColor = $ColorRed
+        }
+    } else {
+        $addr = $script:txtBasicCoordAddr.Text -replace "^ws://", "http://" -replace "^wss://", "https://"
+        try {
+            $headers = @{ "Authorization" = "Bearer $secret" }
+            $response = Invoke-WebRequest -Uri "$addr/status" -Headers $headers -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop
+            $script:lblBasicTestResult.Text = "Connected to orchestrator successfully!"
+            $script:lblBasicTestResult.ForeColor = $ColorGreen
+        } catch {
+            $errMsg = $_.Exception.Message
+            if ($errMsg -match "401") {
+                $script:lblBasicTestResult.Text = "Wrong shared secret. Check it matches the orchestrator."
+            } elseif ($errMsg -match "Unable to connect|No connection") {
+                $script:lblBasicTestResult.Text = "Cannot reach orchestrator at $addr.`nCheck the address and make sure the relay is running."
+            } else {
+                if ($errMsg -and $errMsg.Length -gt 80) { $errMsg = $errMsg.Substring(0, 80) + "..." }
+                $script:lblBasicTestResult.Text = "Failed: $errMsg"
+            }
+            $script:lblBasicTestResult.ForeColor = $ColorRed
+        }
+    }
+})
+
+$panels[10] = $p10
+
+# ---------------------------------------------------------------------------
+# Helper: get current step flow based on mode
+# ---------------------------------------------------------------------------
+function Get-StepFlow {
+    if ($script:SetupMode -eq "basic") { return $script:BasicFlow }
+    return $script:AdvancedFlow
+}
+
+# Helper: get index within the current flow for a given panel index
+function Get-FlowIndex {
+    param([int]$PanelIndex)
+    $flow = Get-StepFlow
+    for ($i = 0; $i -lt $flow.Count; $i++) {
+        if ($flow[$i] -eq $PanelIndex) { return $i }
+    }
+    return -1
+}
+
 # ---------------------------------------------------------------------------
 # Helper: collect config values from the UI fields
 # ---------------------------------------------------------------------------
 function Collect-Config {
-    $script:Config.agentName = $script:txtAgentName.Text.Trim()
-    $script:Config.agentDescription = $script:txtAgentDesc.Text.Trim()
-    $caps = @()
-    if ($script:chkCapCode.Checked)     { $caps += "code"; $caps += "refactor"; $caps += "debug" }
-    if ($script:chkCapReview.Checked)   { $caps += "review"; $caps += "audit" }
-    if ($script:chkCapResearch.Checked) { $caps += "research"; $caps += "analysis" }
-    if ($script:chkCapBrowsing.Checked) { $caps += "browsing"; $caps += "web" }
-    if ($script:chkCapData.Checked)     { $caps += "data"; $caps += "files"; $caps += "pdf" }
-    if ($script:chkCapCustom.Checked -and $script:txtCustomCaps.Text.Trim() -ne "") {
-        $caps += @(($script:txtCustomCaps.Text -split ",") | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
-    }
-    $script:Config.agentCapabilities = $caps
-    $script:Config.machineId = $script:txtMachineId.Text.Trim()
-    $script:Config.connectionMode = if ($script:radioAuto.Checked) { "auto" } else { "manual" }
-    $script:Config.coordinatorHost = $script:txtCoordAddr.Text.Trim()
-    $script:Config.sharedSecret = $script:txtSecret.Text.Trim()
-    $script:Config.defaultWorkingDir = $script:txtWorkDir.Text.Trim()
-    $script:Config.allowedDirs = @(($script:txtAllowed.Text -split "`r?`n") | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
-    $script:Config.denyDirs = @(($script:txtDenied.Text -split "`r?`n") | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
-    $script:Config.keepAwake = $script:chkKeepAwake.Checked
-    $script:Config.enableTls = $script:chkTls.Checked
-    $script:Config.installService = $script:chkService.Checked
-    $script:Config.startAfterSetup = $script:chkStartAfter.Checked
-
-    $outputMap = @{
-        "100 KB"  = 100000
-        "500 KB"  = 500000
-        "1 MB"    = 1000000
-        "5 MB"    = 5000000
-        "10 MB"   = 10000000
-    }
-    $selected = $script:cmbMaxOutput.SelectedItem
-    if ($outputMap.ContainsKey($selected)) {
-        $script:Config.maxOutputLength = $outputMap[$selected]
-    } else {
+    if ($script:SetupMode -eq "basic") {
+        # Basic mode: read from basic config panel, use defaults for the rest
+        $script:Config.agentName = $script:txtBasicAgentName.Text.Trim()
+        $script:Config.agentDescription = ""
+        $script:Config.agentCapabilities = @("browsing", "web")
+        # machineId stays as auto-generated default
+        $script:Config.connectionMode = if ($script:radioBasicAuto.Checked) { "auto" } else { "manual" }
+        $script:Config.coordinatorHost = $script:txtBasicCoordAddr.Text.Trim()
+        $script:Config.sharedSecret = $script:txtBasicSecret.Text.Trim()
+        $script:Config.defaultWorkingDir = "C:\workspace"
+        $script:Config.allowedDirs = @("C:\workspace")
+        $script:Config.denyDirs = @("C:\Windows", "C:\Program Files", "C:\Program Files (x86)", "C:\Users\*\AppData")
+        $script:Config.keepAwake = $true
+        $script:Config.enableTls = $false
+        $script:Config.installService = $false
+        $script:Config.startAfterSetup = $true
         $script:Config.maxOutputLength = 1000000
+    } else {
+        # Advanced mode: read from all panels
+        $script:Config.agentName = $script:txtAgentName.Text.Trim()
+        $script:Config.agentDescription = $script:txtAgentDesc.Text.Trim()
+        $caps = @()
+        if ($script:chkCapCode.Checked)     { $caps += "code"; $caps += "refactor"; $caps += "debug" }
+        if ($script:chkCapReview.Checked)   { $caps += "review"; $caps += "audit" }
+        if ($script:chkCapResearch.Checked) { $caps += "research"; $caps += "analysis" }
+        if ($script:chkCapBrowsing.Checked) { $caps += "browsing"; $caps += "web" }
+        if ($script:chkCapData.Checked)     { $caps += "data"; $caps += "files"; $caps += "pdf" }
+        if ($script:chkCapCustom.Checked -and $script:txtCustomCaps.Text.Trim() -ne "") {
+            $caps += @(($script:txtCustomCaps.Text -split ",") | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
+        }
+        $script:Config.agentCapabilities = $caps
+        $script:Config.machineId = $script:txtMachineId.Text.Trim()
+        $script:Config.connectionMode = if ($script:radioAuto.Checked) { "auto" } else { "manual" }
+        $script:Config.coordinatorHost = $script:txtCoordAddr.Text.Trim()
+        $script:Config.sharedSecret = $script:txtSecret.Text.Trim()
+        $script:Config.defaultWorkingDir = $script:txtWorkDir.Text.Trim()
+        $script:Config.allowedDirs = @(($script:txtAllowed.Text -split "`r?`n") | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
+        $script:Config.denyDirs = @(($script:txtDenied.Text -split "`r?`n") | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
+        $script:Config.keepAwake = $script:chkKeepAwake.Checked
+        $script:Config.enableTls = $script:chkTls.Checked
+        $script:Config.installService = $script:chkService.Checked
+        $script:Config.startAfterSetup = $script:chkStartAfter.Checked
+
+        $outputMap = @{
+            "100 KB"  = 100000
+            "500 KB"  = 500000
+            "1 MB"    = 1000000
+            "5 MB"    = 5000000
+            "10 MB"   = 10000000
+        }
+        $selected = $script:cmbMaxOutput.SelectedItem
+        if ($outputMap.ContainsKey($selected)) {
+            $script:Config.maxOutputLength = $outputMap[$selected]
+        } else {
+            $script:Config.maxOutputLength = 1000000
+        }
     }
 }
 
@@ -796,12 +1020,15 @@ function Write-InstallLog {
 # Update sidebar to highlight the current step
 # ---------------------------------------------------------------------------
 function Update-Sidebar {
+    $flowIdx = Get-FlowIndex $script:CurrentStep
+    $flow = Get-StepFlow
     for ($i = 0; $i -lt $script:stepLabels.Count; $i++) {
-        if ($i -eq $script:CurrentStep) {
+        if (-not $script:stepLabels[$i].Visible) { continue }
+        if ($i -eq $flowIdx) {
             $script:stepLabels[$i].Font = $FontStepActive
             $script:stepLabels[$i].ForeColor = $ColorHighlight
             $script:stepLabels[$i].BackColor = $ColorAccent
-        } elseif ($i -lt $script:CurrentStep) {
+        } elseif ($i -lt $flowIdx) {
             $script:stepLabels[$i].Font = $FontStep
             $script:stepLabels[$i].ForeColor = $ColorGreen
             $script:stepLabels[$i].BackColor = [System.Drawing.Color]::Transparent
@@ -827,15 +1054,31 @@ function Show-Step {
     $script:CurrentStep = $StepIndex
     Update-Sidebar
 
-    # Navigation button visibility
-    $btnBack.Visible = ($StepIndex -gt 0) -and ($StepIndex -lt 6)
-    $btnCancel.Visible = ($StepIndex -lt 6)
+    $flow = Get-StepFlow
+    $flowIdx = Get-FlowIndex $StepIndex
+    $isInstalling = ($StepIndex -eq 6)
+    $isComplete = ($StepIndex -eq 7)
+    $isReview = ($StepIndex -eq 5)
 
-    switch ($StepIndex) {
-        5 { $btnNext.Text = "Install"; $btnNext.Visible = $true }
-        6 { $btnNext.Visible = $false; $btnBack.Visible = $false; $btnCancel.Visible = $false }
-        7 { $btnNext.Text = "Finish"; $btnNext.Visible = $true; $btnBack.Visible = $false; $btnCancel.Visible = $false }
-        default { $btnNext.Text = "Next"; $btnNext.Visible = $true }
+    # Navigation button visibility
+    $btnBack.Visible = ($flowIdx -gt 0) -and (-not $isInstalling) -and (-not $isComplete)
+    $btnCancel.Visible = (-not $isInstalling) -and (-not $isComplete)
+
+    if ($isReview) {
+        $btnNext.Text = "Install"
+        $btnNext.Visible = $true
+    } elseif ($isInstalling) {
+        $btnNext.Visible = $false
+        $btnBack.Visible = $false
+        $btnCancel.Visible = $false
+    } elseif ($isComplete) {
+        $btnNext.Text = "Finish"
+        $btnNext.Visible = $true
+        $btnBack.Visible = $false
+        $btnCancel.Visible = $false
+    } else {
+        $btnNext.Text = "Next"
+        $btnNext.Visible = $true
     }
 
     # Populate review panel when entering step 5
@@ -871,7 +1114,22 @@ $json
 function Validate-Step {
     param([int]$StepIndex)
 
-    if ($StepIndex -eq 1) {
+    if ($StepIndex -eq 10) {
+        # Basic config validation
+        if ($script:txtBasicAgentName.Text.Trim() -eq "") {
+            [void][System.Windows.Forms.MessageBox]::Show("Agent name is required.", "Validation", "OK", "Warning")
+            return $false
+        }
+        if ($script:txtBasicSecret.Text.Trim() -eq "") {
+            [void][System.Windows.Forms.MessageBox]::Show("Shared secret is required. Get this from whoever set up the orchestrator.", "Validation", "OK", "Warning")
+            return $false
+        }
+        if ($script:radioBasicManual.Checked -and $script:txtBasicCoordAddr.Text.Trim() -eq "") {
+            [void][System.Windows.Forms.MessageBox]::Show("Orchestrator address is required for manual connection.", "Validation", "OK", "Warning")
+            return $false
+        }
+    }
+    elseif ($StepIndex -eq 1) {
         if ($script:txtAgentName.Text.Trim() -eq "") {
             [void][System.Windows.Forms.MessageBox]::Show("Agent name is required.", "Validation", "OK", "Warning")
             return $false
@@ -1052,9 +1310,11 @@ function Run-Install {
 # ---------------------------------------------------------------------------
 $btnNext.Add_Click({
     $step = $script:CurrentStep
+    $flow = Get-StepFlow
+    $flowIdx = Get-FlowIndex $step
 
-    # Validate current step before advancing
-    if ($step -ge 1 -and $step -le 4) {
+    # Validate current step before advancing (steps that need validation)
+    if ($step -eq 10 -or ($step -ge 1 -and $step -le 4)) {
         Collect-Config
         if (-not (Validate-Step $step)) { return }
     }
@@ -1079,15 +1339,18 @@ $btnNext.Add_Click({
         return
     }
 
-    if ($step -lt ($script:TotalSteps - 1)) {
-        Show-Step ($step + 1)
+    # Move to next step in the flow
+    if ($flowIdx -ge 0 -and $flowIdx -lt ($flow.Count - 1)) {
+        Show-Step $flow[$flowIdx + 1]
     }
 })
 
 $btnBack.Add_Click({
     $step = $script:CurrentStep
-    if ($step -gt 0) {
-        Show-Step ($step - 1)
+    $flow = Get-StepFlow
+    $flowIdx = Get-FlowIndex $step
+    if ($flowIdx -gt 0) {
+        Show-Step $flow[$flowIdx - 1]
     }
 })
 
