@@ -424,25 +424,25 @@ New-StyledLabel -Parent $p2 -Text "Shared Secret (required)" -X 20 -Y 224 -Width
 $script:txtSecret = New-StyledTextBox -Parent $p2 -Text "" -X 20 -Y 248 -Width 340
 New-StyledLabel -Parent $p2 -Text "Get this from whoever set up the orchestrator" -X 20 -Y 276 -Width 400 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
-$script:btnTest = New-StyledButton -Parent $p2 -Text "Test Connection" -X 20 -Y 310 -Width 140 -Height 30 -BackColor $ColorAccent
-$script:lblTestResult = New-StyledLabel -Parent $p2 -Text "" -X 170 -Y 316 -Width 280 -Height 22 -Font $FontSmall -ForeColor $ColorLightGray
+$script:btnTest = New-StyledButton -Parent $p2 -Text "Test Connection" -X 20 -Y 308 -Width 140 -Height 30 -BackColor $ColorAccent
+$script:lblTestResult = New-StyledLabel -Parent $p2 -Text "" -X 20 -Y 344 -Width 440 -Height 40 -Font $FontBody -ForeColor $ColorLightGray
 
 $script:btnTest.Add_Click({
-    $script:lblTestResult.Text = "Testing..."
+    $script:lblTestResult.Text = ""
     $script:lblTestResult.ForeColor = $ColorLightGray
     $form.Refresh()
 
     # Require shared secret for both modes
     $secret = $script:txtSecret.Text.Trim()
     if ($secret -eq "") {
-        $script:lblTestResult.Text = "Enter shared secret first"
+        $script:lblTestResult.Text = "Please enter the shared secret first.`nYou can find it in the orchestrator's dashboard settings."
         $script:lblTestResult.ForeColor = $ColorRed
         return
     }
 
     if ($script:radioAuto.Checked) {
         # Try UDP discovery for ~10 seconds, verifying HMAC signature
-        $script:lblTestResult.Text = "Listening for broadcast (10s)..."
+        $script:lblTestResult.Text = "Listening for orchestrator broadcast (10s)..."
         $form.Refresh()
         try {
             $escapedSecret = $secret -replace "'", "''"
@@ -474,14 +474,23 @@ try {
     `$socket.Close()
 }
 "@
-            $udpStr = if ($udpResult -is [array]) { $udpResult -join "" } else { "$udpResult" }
+            $udpStr = if ($udpResult -is [array]) { $udpResult -join "`n" } else { "$udpResult" }
+            $udpStr = $udpStr.Trim()
             if ($udpStr -like "OK:*") {
                 $relay = $udpStr -replace "^OK:", ""
-                $script:lblTestResult.Text = "OK! Relay at $relay"
+                $script:lblTestResult.Text = "Relay found at $relay"
                 $script:lblTestResult.ForeColor = $ColorGreen
+            } elseif ($udpStr -match "HMAC mismatch") {
+                $script:lblTestResult.Text = "Wrong shared secret. Check it matches the orchestrator."
+                $script:lblTestResult.ForeColor = $ColorRed
+            } elseif ($udpStr -match "No broadcast") {
+                $script:lblTestResult.Text = "No orchestrator found on your network.`nMake sure the relay is running and discovery is enabled."
+                $script:lblTestResult.ForeColor = $ColorRed
+            } elseif ($udpStr -match "Unsigned") {
+                $script:lblTestResult.Text = "Found a relay, but it's unsigned (older version?)."
+                $script:lblTestResult.ForeColor = [System.Drawing.Color]::FromArgb(241, 196, 15)
             } else {
-                $msg = $udpStr -replace "^FAIL:", ""
-                $script:lblTestResult.Text = "Failed: $msg"
+                $script:lblTestResult.Text = "Failed: $udpStr"
                 $script:lblTestResult.ForeColor = $ColorRed
             }
         } catch {
@@ -495,12 +504,18 @@ try {
         try {
             $headers = @{ "Authorization" = "Bearer $secret" }
             $response = Invoke-WebRequest -Uri "$addr/status" -Headers $headers -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop
-            $script:lblTestResult.Text = "OK! Status $($response.StatusCode)"
+            $script:lblTestResult.Text = "Connected to orchestrator successfully!"
             $script:lblTestResult.ForeColor = $ColorGreen
         } catch {
             $errMsg = $_.Exception.Message
-            if ($errMsg -and $errMsg.Length -gt 50) { $errMsg = $errMsg.Substring(0, 50) + "..." }
-            $script:lblTestResult.Text = "Failed: $errMsg"
+            if ($errMsg -match "401") {
+                $script:lblTestResult.Text = "Wrong shared secret. Check it matches the orchestrator."
+            } elseif ($errMsg -match "Unable to connect|No connection") {
+                $script:lblTestResult.Text = "Cannot reach orchestrator at $addr.`nCheck the address and make sure the relay is running."
+            } else {
+                if ($errMsg -and $errMsg.Length -gt 80) { $errMsg = $errMsg.Substring(0, 80) + "..." }
+                $script:lblTestResult.Text = "Failed: $errMsg"
+            }
             $script:lblTestResult.ForeColor = $ColorRed
         }
     }

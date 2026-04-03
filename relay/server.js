@@ -852,7 +852,8 @@ async function main() {
       }
 
       // Check if worker has exceeded the timeout since last pong
-      if (now - worker.lastPong > HEARTBEAT_TIMEOUT) {
+      // Allow heartbeat interval + timeout before declaring dead
+      if (now - worker.lastPong > HEARTBEAT_INTERVAL + HEARTBEAT_TIMEOUT) {
         console.warn(`[relay] Worker ${id} failed heartbeat, disconnecting`);
 
         // Mark any running tasks for this worker as error

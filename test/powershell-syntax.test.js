@@ -246,7 +246,7 @@ describe('JavaScript security checks', () => {
 
   it('agent wizard Test Connection should require shared secret', () => {
     const content = readFileSync(join(projectRoot, 'installer', 'agent-setup-wizard.ps1'), 'utf-8');
-    assert.ok(content.includes('Enter shared secret first'),
+    assert.ok(content.includes('enter the shared secret first') || content.includes('Please enter the shared secret'),
       'Test Connection should check for empty secret before testing');
   });
 
