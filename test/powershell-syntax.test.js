@@ -353,6 +353,42 @@ describe('JavaScript security checks', () => {
       'Worker should check output for references to denied paths');
   });
 
+  it('worker prompt should include data privacy rules', () => {
+    const content = readFileSync(join(projectRoot, 'worker', 'agent-relay.js'), 'utf-8');
+    assert.ok(content.includes('DATA PRIVACY RULES'),
+      'Worker should include data privacy section in system prompt');
+    assert.ok(content.includes('NEVER include credentials'),
+      'Worker should prohibit credentials in output');
+    assert.ok(content.includes('NEVER include personal information'),
+      'Worker should prohibit PII in output');
+    assert.ok(content.includes('perform a privacy'),
+      'Worker should require privacy assessment before returning sensitive data');
+  });
+
+  it('worker should scan output for credential leaks', () => {
+    const content = readFileSync(join(projectRoot, 'worker', 'agent-relay.js'), 'utf-8');
+    assert.ok(content.includes('Privacy audit'),
+      'Worker should perform privacy audit on output');
+    assert.ok(content.includes('AKIA'),
+      'Worker should detect AWS key patterns');
+    assert.ok(content.includes('PRIVATE KEY'),
+      'Worker should detect private key patterns');
+  });
+
+  it('worker prompt should block system reconnaissance commands', () => {
+    const content = readFileSync(join(projectRoot, 'worker', 'agent-relay.js'), 'utf-8');
+    assert.ok(content.includes('whoami') && content.includes('systeminfo'),
+      'Worker should prohibit system reconnaissance commands in prompt');
+  });
+
+  it('relay should block unsafe prompt patterns', () => {
+    const content = readFileSync(join(projectRoot, 'relay', 'server.js'), 'utf-8');
+    assert.ok(content.includes('unsafePatterns') && content.includes('prompt.blocked'),
+      'Relay should detect and block unsafe prompt patterns');
+    assert.ok(content.includes('exfiltrat'),
+      'Relay should detect data exfiltration attempts');
+  });
+
   it('worker should support --config flag for multiple agents', () => {
     const content = readFileSync(join(projectRoot, 'worker', 'agent-relay.js'), 'utf-8');
     assert.ok(content.includes('--config'), 'Worker should accept --config flag');

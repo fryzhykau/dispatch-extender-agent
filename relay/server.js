@@ -458,6 +458,23 @@ async function handleRequest(req, res) {
       sendJSON(res, 400, { error: `prompt exceeds maximum length of ${MAX_PROMPT_LENGTH} characters` });
       return;
     }
+
+    // --- Prompt content safety check ---
+    // Block requests that attempt to exfiltrate system info or credentials
+    const unsafePatterns = [
+      { pattern: /(?:cat|type|print|read|get-content)\s+.*(?:\/etc\/passwd|\/etc\/shadow|\.env|\.pem|\.key|credentials)/i, reason: 'Attempt to read credential/system files' },
+      { pattern: /(?:whoami|hostname|systeminfo|ipconfig|ifconfig|net\s+user)\s*[|>]/i, reason: 'System info exfiltration with output redirect' },
+      { pattern: /(?:dump|export|exfiltrate|steal|extract)\s+.*(?:password|credential|secret|token|key)/i, reason: 'Credential exfiltration attempt' },
+      { pattern: /curl\s+.*(?:webhook|requestbin|ngrok|burp|pipedream)/i, reason: 'Data exfiltration via external service' },
+    ];
+
+    for (const { pattern, reason } of unsafePatterns) {
+      if (pattern.test(prompt)) {
+        audit.security('prompt.blocked', { ip: req.socket.remoteAddress, reason });
+        sendJSON(res, 400, { error: `Prompt rejected: ${reason}` });
+        return;
+      }
+    }
     if (workingDir !== undefined && workingDir !== null) {
       if (typeof workingDir !== 'string' || workingDir.length === 0 || workingDir.length > 500) {
         sendJSON(res, 400, { error: 'workingDir must be a non-empty string (max 500 chars)' });
