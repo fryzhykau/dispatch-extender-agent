@@ -262,17 +262,31 @@ function handleTask(msg) {
 
   log(`Starting task ${taskId} in ${cwd}`);
 
-  // Build Claude CLI arguments with directory-scoped permissions
-  // Use --permission-mode auto instead of --dangerously-skip-permissions
-  // to restrict Claude to the working directory and explicitly allowed dirs
+  // Build Claude CLI arguments with directory restrictions
   const claudeArgs = ["--print", "--permission-mode", "auto"];
 
-  // Add allowed directories so Claude can only access these paths
+  // Add allowed directories
   for (const dir of (allowedDirs || [])) {
     claudeArgs.push("--add-dir", dir);
   }
 
-  claudeArgs.push(prompt);
+  // Build a directory restriction preamble for the prompt
+  const allowedPaths = (allowedDirs || [cwd]).map(d => d.replace(/\\/g, '/')).join(', ');
+  const denyPaths = (denyDirs || []).map(d => d.replace(/\\/g, '/')).join(', ');
+  const restrictionPrompt = [
+    `IMPORTANT SECURITY RULES — you MUST follow these:`,
+    `- Your working directory is: ${cwd.replace(/\\/g, '/')}`,
+    `- You may ONLY read, write, and execute within these directories: ${allowedPaths}`,
+    denyPaths ? `- You must NEVER access these directories: ${denyPaths}` : '',
+    `- Do NOT access, read, list, or navigate to any directory outside the allowed list above.`,
+    `- Do NOT access C:/Windows, C:/Program Files, C:/Users/*/AppData, or any system directory.`,
+    `- If a task requires accessing a restricted path, refuse and explain why.`,
+    ``,
+    `USER TASK:`,
+    prompt,
+  ].filter(Boolean).join('\n');
+
+  claudeArgs.push(restrictionPrompt);
 
   const child = spawn(
     "claude",

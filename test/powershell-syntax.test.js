@@ -321,6 +321,16 @@ describe('JavaScript security checks', () => {
       'Worker should pass allowed directories via --add-dir');
   });
 
+  it('worker should prepend directory restrictions to prompts', () => {
+    const content = readFileSync(join(projectRoot, 'worker', 'agent-relay.js'), 'utf-8');
+    assert.ok(content.includes('SECURITY RULES'),
+      'Worker should prepend security restriction rules to prompts');
+    assert.ok(content.includes('ONLY read, write, and execute within'),
+      'Worker should specify allowed directories in prompt');
+    assert.ok(content.includes('NEVER access'),
+      'Worker should specify denied directories in prompt');
+  });
+
   it('worker should support --config flag for multiple agents', () => {
     const content = readFileSync(join(projectRoot, 'worker', 'agent-relay.js'), 'utf-8');
     assert.ok(content.includes('--config'), 'Worker should accept --config flag');
