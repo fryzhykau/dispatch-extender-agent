@@ -106,7 +106,25 @@ npm run worker
 
 ### 6. Open the dashboard
 
-Navigate to `http://localhost:7070/dashboard` in your browser. Enter your Bearer token (the shared secret) in settings.
+Navigate to `http://localhost:7070/dashboard` in your browser. Enter your shared secret (Bearer token) in settings.
+
+### Running multiple agents on one machine
+
+You can run multiple agents on the same machine with different configs. Each agent needs a unique `machineId` and `agentName`:
+
+```bash
+# Copy the default config
+cp worker/worker-config.json worker/config-codebot.json
+cp worker/worker-config.json worker/config-researcher.json
+
+# Edit each config — set different machineId, agentName, agentCapabilities, defaultWorkingDir
+
+# Run each agent with its own config
+node worker/agent-relay.js --config worker/config-codebot.json
+node worker/agent-relay.js --config worker/config-researcher.json
+```
+
+Each agent registers independently with the relay and appears as a separate worker in the dashboard. This is useful for testing or running specialized agents with different capabilities and working directories on the same machine.
 
 ## Architecture
 

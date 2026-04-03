@@ -296,6 +296,12 @@ describe('JavaScript security checks', () => {
       'Worker should log close code and reason for disconnect diagnostics');
   });
 
+  it('worker should support --config flag for multiple agents', () => {
+    const content = readFileSync(join(projectRoot, 'worker', 'agent-relay.js'), 'utf-8');
+    assert.ok(content.includes('--config'), 'Worker should accept --config flag');
+    assert.ok(content.includes('configPath'), 'Worker should resolve config path from flag');
+  });
+
   it('agent wizard should have elevated config write fallback', () => {
     const content = readFileSync(join(projectRoot, 'installer', 'agent-setup-wizard.ps1'), 'utf-8');
     assert.ok(content.includes('Verb RunAs'),

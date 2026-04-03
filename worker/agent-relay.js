@@ -9,9 +9,20 @@ import WebSocket from "ws";
 // ---------------------------------------------------------------------------
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const config = JSON.parse(
-  readFileSync(join(__dirname, "worker-config.json"), "utf-8")
-);
+
+// Support --config flag for running multiple agents on the same machine
+const args = process.argv.slice(2);
+const configFlag = args.indexOf("--config");
+const configPath = configFlag !== -1 && args[configFlag + 1]
+  ? resolve(args[configFlag + 1])
+  : join(__dirname, "worker-config.json");
+
+if (!existsSync(configPath)) {
+  console.error(`[agent] Config file not found: ${configPath}`);
+  process.exit(1);
+}
+
+const config = JSON.parse(readFileSync(configPath, "utf-8"));
 
 const { machineId, sharedSecret, defaultWorkingDir, allowedDirs, denyDirs, agentName, agentDescription, agentCapabilities } = config;
 let coordinatorHost = config.coordinatorHost;
@@ -397,7 +408,7 @@ process.on("SIGTERM", () => shutdown("SIGTERM"));
 // ---------------------------------------------------------------------------
 
 async function start() {
-  log("Agent relay starting");
+  log(`Agent relay starting (config: ${configPath})`);
 
   // Attempt UDP discovery if enabled and coordinatorHost is empty or "auto"
   if (discoveryConfig.enabled && (!coordinatorHost || coordinatorHost === "auto")) {

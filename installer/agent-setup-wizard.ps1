@@ -381,7 +381,7 @@ New-StyledLabel -Parent $p1 -Text "Select what this agent can do (used for task 
 $script:chkCapCode     = New-StyledCheckBox -Parent $p1 -Text "Code (write, refactor, debug)" -X 20 -Y 256 -Width 210 -Checked $true
 $script:chkCapReview   = New-StyledCheckBox -Parent $p1 -Text "Review (code review, audit)" -X 240 -Y 256 -Width 210 -Checked $true
 $script:chkCapResearch = New-StyledCheckBox -Parent $p1 -Text "Research (web search, analysis)" -X 20 -Y 280 -Width 210
-$script:chkCapBrowsing = New-StyledCheckBox -Parent $p1 -Text "Browsing (web navigation)" -X 240 -Y 280 -Width 210
+$script:chkCapBrowsing = New-StyledCheckBox -Parent $p1 -Text "Browsing (web navigation)" -X 240 -Y 280 -Width 210 -Checked $true
 $script:chkCapData     = New-StyledCheckBox -Parent $p1 -Text "Data (files, spreadsheets, PDF)" -X 20 -Y 304 -Width 210
 $script:chkCapCustom   = New-StyledCheckBox -Parent $p1 -Text "Custom:" -X 240 -Y 304 -Width 70
 $script:txtCustomCaps  = New-StyledTextBox -Parent $p1 -Text "" -X 316 -Y 304 -Width 134
