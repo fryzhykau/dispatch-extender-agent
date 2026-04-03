@@ -33,8 +33,7 @@ DisableProgramGroupPage=yes
 ; Output settings
 OutputDir=..\dist
 OutputBaseFilename=DispatchAgentSetup
-; Uncomment the next line if you have generated assets via create-assets.ps1:
-; SetupIconFile=assets\icon.ico
+SetupIconFile=assets\agent-icon.ico
 
 ; Compression (LZMA2 ultra for smallest output)
 Compression=lzma2/ultra64
@@ -43,9 +42,8 @@ LZMANumBlockThreads=4
 
 ; Modern wizard style
 WizardStyle=modern
-; Uncomment these if you have generated assets via create-assets.ps1:
-; WizardImageFile=assets\wizard-banner.bmp
-; WizardSmallImageFile=assets\wizard-small.bmp
+WizardImageFile=assets\agent-wizard-banner.bmp
+WizardSmallImageFile=assets\agent-wizard-small.bmp
 
 ; Privileges and platform
 PrivilegesRequired=admin
@@ -54,6 +52,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 
 ; Uninstall settings
 UninstallDisplayName={#MyAppName}
+UninstallDisplayIcon={app}\installer\assets\icon.ico
 
 ; Misc
 AllowNoIcons=yes
@@ -81,6 +80,9 @@ Source: "agent-setup-wizard.ps1";        DestDir: "{app}\installer"; Flags: igno
 ; Minimal package.json for npm install (only ws dependency)
 Source: "agent-package.json";            DestDir: "{app}"; DestName: "package.json"; Flags: ignoreversion
 
+; Icon for uninstall display and shortcuts
+Source: "assets\agent-icon.ico";         DestDir: "{app}\installer\assets"; DestName: "icon.ico"; Flags: ignoreversion
+
 ; --------------------------------------------------------------------------
 ; Registry entries
 ; --------------------------------------------------------------------------
@@ -101,22 +103,24 @@ Name: "{group}\Agent Setup"; Filename: "powershell.exe"; \
 Name: "{group}\Start Agent"; Filename: "cmd.exe"; \
   Parameters: "/K node worker/agent-relay.js"; \
   WorkingDir: "{app}"; Comment: "Start the worker agent connected to the coordinator"; \
-  IconFilename: "cmd.exe"
+  IconFilename: "{app}\installer\assets\icon.ico"
 
 ; Stop Agent
 Name: "{group}\Stop Agent"; Filename: "cmd.exe"; \
   Parameters: "/C echo Stopping Dispatch Agent... & taskkill /F /FI ""WINDOWTITLE eq worker/agent-relay.js*"" >nul 2>&1 & sc stop DispatchWorker >nul 2>&1 & nssm stop DispatchWorker >nul 2>&1 & echo Done. & pause"; \
   WorkingDir: "{app}"; Comment: "Stop the running worker agent or service"; \
-  IconFilename: "cmd.exe"
+  IconFilename: "{app}\installer\assets\icon.ico"
 
 ; Desktop shortcuts (user can deselect via Tasks)
 Name: "{autodesktop}\Start Agent"; Filename: "cmd.exe"; \
   Parameters: "/K node worker/agent-relay.js"; WorkingDir: "{app}"; \
-  Comment: "Start the worker agent"; Tasks: desktopicon
+  Comment: "Start the worker agent"; Tasks: desktopicon; \
+  IconFilename: "{app}\installer\assets\icon.ico"
 
 Name: "{autodesktop}\Agent Setup"; Filename: "powershell.exe"; \
   Parameters: "-ExecutionPolicy Bypass -File ""{app}\installer\agent-setup-wizard.ps1"""; WorkingDir: "{app}"; \
-  Comment: "Run the agent setup wizard"; Tasks: desktopicon
+  Comment: "Run the agent setup wizard"; Tasks: desktopicon; \
+  IconFilename: "{app}\installer\assets\icon.ico"
 
 ; --------------------------------------------------------------------------
 ; Optional tasks presented to the user

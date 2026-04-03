@@ -220,6 +220,21 @@
   }
   .task-form .submit-btn:hover { opacity: 0.85; }
   .task-form .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .task-form select:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .agent-count {
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 2px 10px;
+    border-radius: 12px;
+    margin-left: 8px;
+    vertical-align: middle;
+    background: var(--accent);
+    color: var(--red);
+  }
+  .agent-count.has-agents {
+    color: var(--green);
+  }
 
   /* Machine cards grid */
   .machine-grid {
@@ -508,7 +523,7 @@
 
   <!-- Submit Task -->
   <div class="panel">
-    <h2>Submit Task</h2>
+    <h2>Submit Task <span id="agentCount" class="agent-count">0 agents connected</span></h2>
     <div class="task-form" id="taskForm">
       <div>
         <label for="machineSelect">Machine</label>
@@ -687,19 +702,17 @@
   }
 
   async function apiFetch(endpoint, options) {
+    if (!authToken) {
+      document.getElementById('setupBanner').classList.add('visible');
+      return { ok: false, status: 401, json: () => Promise.resolve({}) };
+    }
     var url = relayUrl.replace(/\/+$/, '') + endpoint;
     options = options || {};
     options.headers = options.headers || {};
-    if (authToken) {
-      options.headers['Authorization'] = 'Bearer ' + authToken;
-    }
+    options.headers['Authorization'] = 'Bearer ' + authToken;
     var resp = await fetch(url, options);
     if (resp.status === 401) {
-      if (!authToken) {
-        document.getElementById('setupBanner').classList.add('visible');
-      } else {
-        showToast('Authentication failed \u2014 check your token in settings', 'error');
-      }
+      showToast('Authentication failed \u2014 check your token in settings', 'error');
     }
     return resp;
   }
@@ -759,10 +772,26 @@
         }).join('');
       }
 
+      // Update agent count badge
+      var agentCountEl = document.getElementById('agentCount');
+      var count = machines.length;
+      agentCountEl.textContent = count + ' agent' + (count !== 1 ? 's' : '') + ' connected';
+      if (count > 0) {
+        agentCountEl.classList.add('has-agents');
+      } else {
+        agentCountEl.classList.remove('has-agents');
+      }
+
+      // Disable submit form when no agents connected
+      machineSelect.disabled = count === 0;
+      submitTaskBtn.disabled = count === 0;
+
       // Update machine select dropdown
       var currentVal = machineSelect.value;
-      machineSelect.innerHTML = '<option value="">-- select agent --</option>' +
-        '<option value="any"' + (currentVal === 'any' ? ' selected' : '') + '>Any (auto-select)</option>' +
+      machineSelect.innerHTML = (count === 0
+        ? '<option value="">No agents available</option>'
+        : '<option value="">-- select agent --</option>' +
+          '<option value="any"' + (currentVal === 'any' ? ' selected' : '') + '>Any (auto-select)</option>') +
         machines.map(function(m) {
           var label = m.agentName
             ? escapeHtml(m.agentName) + ' (' + escapeHtml(m.machineId) + ')'

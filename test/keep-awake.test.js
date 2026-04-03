@@ -46,12 +46,12 @@ describe('keep-awake PowerShell script', () => {
     const __dirname = dirname(fileURLToPath(import.meta.url));
     const source = readFileSync(join(__dirname, '..', 'lib', 'keep-awake.js'), 'utf-8');
 
-    // The main loop should cast to [uint32]
-    assert.ok(source.includes('[uint32]0x80000001'),
-      'PS_SCRIPT should use [uint32] cast for ES_CONTINUOUS | ES_SYSTEM_REQUIRED');
+    // The main loop should use decimal to avoid PowerShell signed hex overflow
+    assert.ok(source.includes('[uint32]2147483649'),
+      'PS_SCRIPT should use decimal 2147483649 for ES_CONTINUOUS | ES_SYSTEM_REQUIRED');
 
-    // The clear script should also cast
-    assert.ok(source.includes('[uint32]0x80000000'),
-      'PS_CLEAR_SCRIPT should use [uint32] cast for ES_CONTINUOUS');
+    // The clear script should also use decimal
+    assert.ok(source.includes('[uint32]2147483648'),
+      'PS_CLEAR_SCRIPT should use decimal 2147483648 for ES_CONTINUOUS');
   });
 });

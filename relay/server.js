@@ -271,6 +271,13 @@ async function handleRequest(req, res) {
     return;
   }
 
+  // Silently ignore favicon requests (browsers auto-request this)
+  if (req.method === 'GET' && pathname === '/favicon.ico') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
   // --- Authentication for API endpoints ---
   if (!authenticate(req)) {
     const ip = req.socket.remoteAddress;

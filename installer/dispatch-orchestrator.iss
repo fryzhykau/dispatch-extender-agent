@@ -33,8 +33,7 @@ DisableProgramGroupPage=yes
 ; Output settings
 OutputDir=..\dist
 OutputBaseFilename=DispatchOrchestratorSetup
-; Uncomment the next line if you have generated assets via create-assets.ps1:
-; SetupIconFile=assets\icon.ico
+SetupIconFile=assets\icon.ico
 
 ; Compression (LZMA2 ultra for smallest output)
 Compression=lzma2/ultra64
@@ -43,9 +42,8 @@ LZMANumBlockThreads=4
 
 ; Modern wizard style
 WizardStyle=modern
-; Uncomment these if you have generated assets via create-assets.ps1:
-; WizardImageFile=assets\wizard-banner.bmp
-; WizardSmallImageFile=assets\wizard-small.bmp
+WizardImageFile=assets\wizard-banner.bmp
+WizardSmallImageFile=assets\wizard-small.bmp
 
 ; Privileges and platform
 PrivilegesRequired=admin
@@ -81,6 +79,13 @@ Source: "..\package-lock.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\CLAUDE.md";  DestDir: "{app}"; Flags: ignoreversion
 Source: "..\README.md";  DestDir: "{app}"; Flags: ignoreversion
 
+; Icon for uninstall display and shortcuts
+Source: "assets\icon.ico"; DestDir: "{app}\installer\assets"; Flags: ignoreversion
+
+; Launcher scripts (with logging)
+Source: "launch-wizard.ps1"; DestDir: "{app}\installer"; Flags: ignoreversion
+Source: "launch-dashboard.ps1"; DestDir: "{app}\installer"; Flags: ignoreversion
+
 ; --------------------------------------------------------------------------
 ; Registry entries
 ; --------------------------------------------------------------------------
@@ -106,35 +111,28 @@ Name: "{group}\Dispatch Dashboard"; Filename: "http://localhost:7070/dashboard";
 Name: "{group}\Start Relay"; Filename: "cmd.exe"; \
   Parameters: "/K node relay/server.js"; \
   WorkingDir: "{app}"; Comment: "Start the WebSocket relay server"; \
-  IconFilename: "cmd.exe"
-
-; Start Worker
-Name: "{group}\Start Worker"; Filename: "cmd.exe"; \
-  Parameters: "/K node worker/agent-relay.js"; \
-  WorkingDir: "{app}"; Comment: "Start a worker agent connected to the relay"; \
-  IconFilename: "cmd.exe"
+  IconFilename: "{app}\installer\assets\icon.ico"
 
 ; Desktop shortcuts (user can deselect via Tasks)
 Name: "{autodesktop}\Dispatch Dashboard"; Filename: "http://localhost:7070/dashboard"; \
-  Comment: "Open the Dispatch Orchestrator dashboard"; Tasks: desktopicon
+  Comment: "Open the Dispatch Orchestrator dashboard"; Tasks: desktopicon; \
+  IconFilename: "{app}\installer\assets\icon.ico"
 
 Name: "{autodesktop}\Start Relay"; Filename: "cmd.exe"; \
   Parameters: "/K node relay/server.js"; WorkingDir: "{app}"; \
-  Comment: "Start the WebSocket relay server"; Tasks: desktopicon
-
-Name: "{autodesktop}\Start Worker"; Filename: "cmd.exe"; \
-  Parameters: "/K node worker/agent-relay.js"; WorkingDir: "{app}"; \
-  Comment: "Start a worker agent"; Tasks: desktopicon
+  Comment: "Start the WebSocket relay server"; Tasks: desktopicon; \
+  IconFilename: "{app}\installer\assets\icon.ico"
 
 Name: "{autodesktop}\Dispatch Setup"; Filename: "powershell.exe"; \
   Parameters: "-ExecutionPolicy Bypass -File ""{app}\install\setup-wizard.ps1"""; WorkingDir: "{app}"; \
-  Comment: "Run the setup wizard"; Tasks: desktopicon
+  Comment: "Run the setup wizard"; Tasks: desktopicon; \
+  IconFilename: "{app}\installer\assets\icon.ico"
 
 ; --------------------------------------------------------------------------
 ; Optional tasks presented to the user
 ; --------------------------------------------------------------------------
 [Tasks]
-Name: "desktopicon"; Description: "Create &desktop shortcuts (Dashboard, Start Relay, Start Worker, Setup)"; GroupDescription: "Additional shortcuts:"
+Name: "desktopicon"; Description: "Create &desktop shortcuts (Dashboard, Start Relay, Setup)"; GroupDescription: "Additional shortcuts:"
 ; --------------------------------------------------------------------------
 ; Post-install actions
 ; --------------------------------------------------------------------------
@@ -150,16 +148,17 @@ Filename: "cmd.exe"; \
   Flags: runhidden waituntilterminated
 
 ; Launch the setup wizard after installation completes
-; -WindowStyle Hidden suppresses the PowerShell console so only the WinForms GUI appears
 Filename: "powershell.exe"; \
-  Parameters: "-WindowStyle Hidden -ExecutionPolicy Bypass -File ""{app}\install\setup-wizard.ps1"""; \
+  Parameters: "-ExecutionPolicy Bypass -File ""{app}\installer\launch-wizard.ps1"""; \
   WorkingDir: "{app}"; Description: "Launch the Setup Wizard now"; \
-  Flags: postinstall skipifsilent waituntilterminated; Check: NodeJsInstalled
+  Flags: postinstall skipifsilent waituntilterminated
 
-; Open the dashboard in the default browser
-Filename: "http://localhost:7070/dashboard"; \
-  Description: "Open the Dashboard in your browser"; \
-  Flags: nowait postinstall skipifsilent shellexec unchecked
+; Start the relay and open the dashboard (single checkbox)
+Filename: "powershell.exe"; \
+  Parameters: "-ExecutionPolicy Bypass -File ""{app}\installer\launch-dashboard.ps1"""; \
+  WorkingDir: "{app}"; \
+  Description: "Start the Relay and open the Dashboard"; \
+  Flags: nowait postinstall skipifsilent unchecked; Check: NodeJsInstalled
 
 ; --------------------------------------------------------------------------
 ; Uninstall actions — clean up Windows services
