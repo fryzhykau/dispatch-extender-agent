@@ -712,6 +712,27 @@ async function main() {
   // WebSocket server — mounted on the same HTTP server
   const wss = new WebSocketServer({ server });
 
+  // Handle server startup errors (port in use, etc.)
+  function handleServerError(err) {
+    if (err.code === 'EADDRINUSE') {
+      console.error('');
+      console.error(`[relay] ERROR: Port ${PORT} is already in use.`);
+      console.error(`[relay] Another relay or application is running on this port.`);
+      console.error('');
+      console.error(`[relay] To find what's using it:`);
+      console.error(`        netstat -ano | findstr :${PORT}`);
+      console.error('');
+      console.error(`[relay] To stop it:`);
+      console.error(`        powershell -Command "Stop-Process -Id (Get-NetTCPConnection -LocalPort ${PORT}).OwningProcess -Force"`);
+      console.error('');
+    } else {
+      console.error(`[relay] ERROR: ${err.message}`);
+    }
+    process.exit(1);
+  }
+  server.on('error', handleServerError);
+  wss.on('error', handleServerError);
+
   wss.on('connection', (ws) => {
     let machineId = null;
     let registered = false;
@@ -876,17 +897,6 @@ async function main() {
 
   // Start listening
   let discoveryHandle = null;
-  server.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(`[relay] ERROR: Port ${PORT} is already in use.`);
-      console.error(`[relay] Another relay or application is using this port.`);
-      console.error(`[relay] To find it:  netstat -ano | findstr :${PORT}`);
-      console.error(`[relay] To kill it:  powershell -Command "Stop-Process -Id (Get-NetTCPConnection -LocalPort ${PORT}).OwningProcess -Force"`);
-    } else {
-      console.error(`[relay] ERROR: Failed to start server: ${err.message}`);
-    }
-    process.exit(1);
-  });
 
   server.listen(PORT, '0.0.0.0', async () => {
     console.log(`[relay] Ready — listening on 0.0.0.0:${PORT}`);
