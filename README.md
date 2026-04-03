@@ -267,6 +267,20 @@ All security events are logged to `data/audit.log` (JSONL format):
 
 View recent logs: `GET /audit?level=error&limit=50`
 
+### Agent Sandboxing
+
+Agents run with multiple layers of restriction:
+
+| Layer | What it does |
+|-------|-------------|
+| **Directory restrictions** | `allowedDirs`/`denyDirs` in config — validated at task submission and enforced via prompt rules |
+| **Tool permissions** | `allowedTools`/`disallowedTools` passed to Claude via `--allowedTools`/`--disallowedTools` flags |
+| **Permission mode** | `--permission-mode auto` — auto-approves within allowed directories only |
+| **Prompt injection detection** | Rejects prompts with known injection patterns before execution |
+| **Data privacy rules** | System prompt prohibits returning credentials, PII, or system info |
+| **Output audit** | Scans Claude's output for credential patterns and denied path references |
+| **Relay-side validation** | Blocks prompts requesting credential files or system reconnaissance |
+
 ### TLS Encryption (Optional)
 
 Enable encrypted WebSocket (WSS) and HTTPS:
@@ -424,10 +438,15 @@ Output goes to `dist/` with SHA256 checksums.
 
 The **orchestrator installer** has three Start Menu shortcuts: **Dashboard**, **Start Relay**, and **Setup**. The finish page offers two checkboxes: "Launch Setup Wizard" (checked by default) and "Start Relay and open Dashboard" (unchecked by default). The agent installer is separate, intended for worker machines only.
 
+Both installers offer **Basic** and **Advanced** setup modes:
+- **Basic** (default): Quick setup with just the essentials (port, secret, agent name)
+- **Advanced**: Full control over TLS, services, directories, tool permissions, and all options
+
 Both installers:
 - Check for Node.js and Claude Code CLI prerequisites
 - Run `npm install` automatically
 - Launch the setup wizard after installation
+- Auto-configure dashboard auth token on first launch
 - Create Start Menu shortcuts
 - Include an uninstaller that cleans up services
 - Write installer logs to `%ProgramData%\DispatchOrchestrator\logs\`
@@ -543,7 +562,7 @@ The uninstaller automatically stops and removes Windows services, deletes `node_
 | `queue.enabled` | boolean | `true` | Enable task queuing |
 | `queue.maxQueueSize` | number | `100` | Max queued tasks |
 | `pin.enabled` | boolean | `true` | Require PIN for task submission |
-| `pin.code` | string | `"1234"` | PIN code (change this!) |
+| `pin.code` | string | `"CHANGE-ME"` | PIN code (set during setup) |
 | `pin.maxAttempts` | number | `5` | Failed attempts before lockout |
 | `pin.lockoutMinutes` | number | `15` | Lockout duration |
 
@@ -560,6 +579,8 @@ The uninstaller automatically stops and removes Windows services, deletes `node_
 | `defaultWorkingDir` | string | — | Default working directory |
 | `allowedDirs` | string[] | — | Directories the agent may operate in |
 | `denyDirs` | string[] | — | Directories the agent must never touch |
+| `allowedTools` | string[] | `["Read","Edit","Write","Bash","Glob","Grep","WebFetch","WebSearch"]` | Claude tools this agent may use |
+| `disallowedTools` | string[] | `[]` | Claude tools explicitly denied |
 | `tls.enabled` | boolean | `false` | Use WSS instead of WS |
 | `discovery.enabled` | boolean | `true` | Use UDP discovery to find relay |
 | `maxOutputLength` | number | `1000000` | Truncate output beyond this |
@@ -570,7 +591,7 @@ The uninstaller automatically stops and removes Windows services, deletes `node_
 All tests must pass before pushing to any branch:
 
 ```bash
-npm test             # Run all 210 tests (unit, integration, static analysis, security)
+npm test             # Run all 237 tests (unit, integration, static analysis, security)
 npm run pii-check    # Scan for personal information in source code
 npm run precommit    # Runs both pii-check and tests
 ```
