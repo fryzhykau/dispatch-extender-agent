@@ -209,6 +209,23 @@ describe('JavaScript security checks', () => {
       `shell: true enables command injection:\n${issues.join('\n')}`);
   });
 
+  it('worker/agent-relay.js should not use --dangerously-skip-permissions', () => {
+    const content = readFileSync(join(projectRoot, 'worker', 'agent-relay.js'), 'utf-8');
+    // Allow it in comments but not in actual spawn args
+    const lines = content.split(/\r?\n/);
+    const issues = [];
+    lines.forEach((line, i) => {
+      const trimmed = line.trim();
+      if (trimmed.includes('dangerously-skip-permissions') &&
+          !trimmed.startsWith('//') && !trimmed.startsWith('*') &&
+          !trimmed.startsWith('#')) {
+        issues.push(`  Line ${i + 1}: ${trimmed.substring(0, 80)}`);
+      }
+    });
+    assert.equal(issues.length, 0,
+      `--dangerously-skip-permissions bypasses all restrictions. Use --permission-mode auto instead:\n${issues.join('\n')}`);
+  });
+
   it('relay/config.json should not have default PIN "1234"', () => {
     const config = JSON.parse(readFileSync(join(projectRoot, 'relay', 'config.json'), 'utf-8'));
     assert.notEqual(config.pin?.code, '1234', 'Default PIN should not be "1234"');
@@ -294,6 +311,14 @@ describe('JavaScript security checks', () => {
     const content = readFileSync(join(projectRoot, 'worker', 'agent-relay.js'), 'utf-8');
     assert.ok(content.includes('code') && content.includes('reason'),
       'Worker should log close code and reason for disconnect diagnostics');
+  });
+
+  it('worker should use --permission-mode auto with --add-dir for allowed dirs', () => {
+    const content = readFileSync(join(projectRoot, 'worker', 'agent-relay.js'), 'utf-8');
+    assert.ok(content.includes('permission-mode'),
+      'Worker should use --permission-mode instead of --dangerously-skip-permissions');
+    assert.ok(content.includes('--add-dir'),
+      'Worker should pass allowed directories via --add-dir');
   });
 
   it('worker should support --config flag for multiple agents', () => {

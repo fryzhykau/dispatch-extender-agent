@@ -165,7 +165,7 @@ install/
 1. **Phone** sends a task via Claude Dispatch to the orchestrator
 2. **Orchestrator** decomposes the task, calls `POST /task` on the relay for each subtask
 3. **Relay** routes each subtask to the target worker via WebSocket
-4. **Worker** spawns `claude --print --dangerously-skip-permissions "<prompt>"` and captures output
+4. **Worker** spawns `claude --print --permission-mode auto "<prompt>"` scoped to allowed directories
 5. **Worker** sends the result back through the relay
 6. **Coordinator** aggregates all results and replies to the phone
 

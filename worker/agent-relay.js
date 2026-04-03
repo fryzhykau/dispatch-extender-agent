@@ -262,9 +262,21 @@ function handleTask(msg) {
 
   log(`Starting task ${taskId} in ${cwd}`);
 
+  // Build Claude CLI arguments with directory-scoped permissions
+  // Use --permission-mode auto instead of --dangerously-skip-permissions
+  // to restrict Claude to the working directory and explicitly allowed dirs
+  const claudeArgs = ["--print", "--permission-mode", "auto"];
+
+  // Add allowed directories so Claude can only access these paths
+  for (const dir of (allowedDirs || [])) {
+    claudeArgs.push("--add-dir", dir);
+  }
+
+  claudeArgs.push(prompt);
+
   const child = spawn(
     "claude",
-    ["--print", "--dangerously-skip-permissions", prompt],
+    claudeArgs,
     {
       cwd,
       shell: false,
