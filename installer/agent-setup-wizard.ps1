@@ -696,6 +696,8 @@ $script:lblCompleteStatus = New-StyledLabel -Parent $p7 -Text "" -X 20 -Y 80 -Wi
 $script:lblCompleteAgent = New-StyledLabel -Parent $p7 -Text "" -X 20 -Y 150 -Width 450 -Height 30 -Font $FontBody -ForeColor $ColorLightGray
 $script:lblCompleteHint = New-StyledLabel -Parent $p7 -Text "" -X 20 -Y 200 -Width 450 -Height 80 -Font $FontBody -ForeColor $ColorDimGray
 
+$script:chkStartAgent = New-StyledCheckBox -Parent $p7 -Text "Start the agent now" -X 20 -Y 300 -Width 300 -Checked $true
+
 $panels[7] = $p7
 
 # ---------------------------------------------------------------------------
@@ -1022,23 +1024,7 @@ function Run-Install {
     }
     $script:progressBar.Value = 90
 
-    # Step 8: Start agent (if selected and not installed as service)
-    if ($script:Config.startAfterSetup) {
-        if ($script:Config.installService) {
-            Write-InstallLog "Agent should be running as a service."
-        } else {
-            Write-InstallLog "Starting agent..."
-            try {
-                $agentScript = Join-Path $ProjectRoot "worker\agent-relay.js"
-                Start-Process -FilePath "cmd.exe" -ArgumentList "/K", "node", "`"$agentScript`"" -WorkingDirectory $ProjectRoot
-                Write-InstallLog "  Agent started in a new console window."
-            } catch {
-                Write-InstallLog "  ERROR: Failed to start agent: $_"
-            }
-        }
-    } else {
-        Write-InstallLog "Agent start skipped (not selected)."
-    }
+    # Agent start is deferred to the Finish button (Complete page checkbox)
     $script:progressBar.Value = 100
 
     Write-InstallLog ""
@@ -1081,7 +1067,14 @@ $btnNext.Add_Click({
     }
 
     if ($step -eq 7) {
-        # "Finish" button
+        # "Finish" button — start agent if checkbox is checked
+        if ($script:chkStartAgent -and $script:chkStartAgent.Checked) {
+            if (-not $script:Config.installService) {
+                $agentScript = Join-Path $ProjectRoot "worker\agent-relay.js"
+                $cmdArgs = "/C title Dispatch Agent & node `"$agentScript`" || (echo. & echo Agent stopped. Press any key to close. & pause >nul)"
+                Start-Process cmd.exe -ArgumentList $cmdArgs -WorkingDirectory $ProjectRoot -WindowStyle Minimized
+            }
+        }
         $form.Close()
         return
     }
