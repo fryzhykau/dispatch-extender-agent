@@ -141,9 +141,9 @@ Name: "desktopicon"; Description: "Create &desktop shortcuts (Dashboard, Start R
 ; --------------------------------------------------------------------------
 [Run]
 ; Install npm dependencies (production only)
-Filename: "cmd.exe"; Parameters: "/C npm install --production"; \
+Filename: "cmd.exe"; Parameters: "/C echo Installing dependencies... && npm install --production && echo Done! && timeout /T 2 >nul"; \
   WorkingDir: "{app}"; StatusMsg: "Installing Node.js dependencies..."; \
-  Flags: runhidden waituntilterminated; Check: NodeJsInstalled
+  Flags: runminimized waituntilterminated; Check: NodeJsInstalled
 
 ; Kill any existing relay process before launching the wizard (avoids EADDRINUSE)
 Filename: "cmd.exe"; \

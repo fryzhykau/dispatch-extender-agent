@@ -375,13 +375,22 @@ New-StyledLabel -Parent $p1 -Text "Agent Description" -X 20 -Y 134 -Width 300 -H
 $script:txtAgentDesc = New-StyledTextBox -Parent $p1 -Text "" -X 20 -Y 158 -Width 430
 New-StyledLabel -Parent $p1 -Text "e.g., Handles coding and code review tasks" -X 20 -Y 186 -Width 400 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
-New-StyledLabel -Parent $p1 -Text "Capabilities (comma-separated tags)" -X 20 -Y 216 -Width 300 -Height 20 -Font $FontLabel | Out-Null
-$script:txtCapabilities = New-StyledTextBox -Parent $p1 -Text "code, refactor, review, debug" -X 20 -Y 240 -Width 430
-New-StyledLabel -Parent $p1 -Text "The orchestrator routes tasks to agents by name or capability match" -X 20 -Y 268 -Width 440 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+New-StyledLabel -Parent $p1 -Text "Capabilities" -X 20 -Y 216 -Width 300 -Height 20 -Font $FontLabel | Out-Null
+New-StyledLabel -Parent $p1 -Text "Select what this agent can do (used for task routing)" -X 20 -Y 236 -Width 440 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
-New-StyledLabel -Parent $p1 -Text "Machine ID" -X 20 -Y 304 -Width 300 -Height 20 -Font $FontLabel | Out-Null
-$script:txtMachineId = New-StyledTextBox -Parent $p1 -Text $script:Config.machineId -X 20 -Y 328 -Width 260
-New-StyledLabel -Parent $p1 -Text "Auto-generated, editable" -X 290 -Y 330 -Width 170 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+$script:chkCapCode     = New-StyledCheckBox -Parent $p1 -Text "Code (write, refactor, debug)" -X 20 -Y 256 -Width 210 -Checked $true
+$script:chkCapReview   = New-StyledCheckBox -Parent $p1 -Text "Review (code review, audit)" -X 240 -Y 256 -Width 210 -Checked $true
+$script:chkCapResearch = New-StyledCheckBox -Parent $p1 -Text "Research (web search, analysis)" -X 20 -Y 280 -Width 210
+$script:chkCapBrowsing = New-StyledCheckBox -Parent $p1 -Text "Browsing (web navigation)" -X 240 -Y 280 -Width 210
+$script:chkCapData     = New-StyledCheckBox -Parent $p1 -Text "Data (files, spreadsheets, PDF)" -X 20 -Y 304 -Width 210
+$script:chkCapCustom   = New-StyledCheckBox -Parent $p1 -Text "Custom:" -X 240 -Y 304 -Width 70
+$script:txtCustomCaps  = New-StyledTextBox -Parent $p1 -Text "" -X 316 -Y 304 -Width 134
+$script:txtCustomCaps.Enabled = $false
+$script:chkCapCustom.Add_CheckedChanged({ $script:txtCustomCaps.Enabled = $script:chkCapCustom.Checked })
+
+New-StyledLabel -Parent $p1 -Text "Machine ID" -X 20 -Y 340 -Width 300 -Height 20 -Font $FontLabel | Out-Null
+$script:txtMachineId = New-StyledTextBox -Parent $p1 -Text $script:Config.machineId -X 20 -Y 364 -Width 260
+New-StyledLabel -Parent $p1 -Text "Auto-generated, editable" -X 290 -Y 366 -Width 170 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
 $panels[1] = $p1
 
@@ -680,7 +689,16 @@ $panels[7] = $p7
 function Collect-Config {
     $script:Config.agentName = $script:txtAgentName.Text.Trim()
     $script:Config.agentDescription = $script:txtAgentDesc.Text.Trim()
-    $script:Config.agentCapabilities = @(($script:txtCapabilities.Text -split ",") | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
+    $caps = @()
+    if ($script:chkCapCode.Checked)     { $caps += "code"; $caps += "refactor"; $caps += "debug" }
+    if ($script:chkCapReview.Checked)   { $caps += "review"; $caps += "audit" }
+    if ($script:chkCapResearch.Checked) { $caps += "research"; $caps += "analysis" }
+    if ($script:chkCapBrowsing.Checked) { $caps += "browsing"; $caps += "web" }
+    if ($script:chkCapData.Checked)     { $caps += "data"; $caps += "files"; $caps += "pdf" }
+    if ($script:chkCapCustom.Checked -and $script:txtCustomCaps.Text.Trim() -ne "") {
+        $caps += @(($script:txtCustomCaps.Text -split ",") | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
+    }
+    $script:Config.agentCapabilities = $caps
     $script:Config.machineId = $script:txtMachineId.Text.Trim()
     $script:Config.connectionMode = if ($script:radioAuto.Checked) { "auto" } else { "manual" }
     $script:Config.coordinatorHost = $script:txtCoordAddr.Text.Trim()
