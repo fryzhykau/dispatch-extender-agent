@@ -920,13 +920,23 @@ function Run-Install {
 
     # Step 4: Write worker-config.json
     Write-InstallLog "Writing worker-config.json..."
+    $json = Build-ConfigJson
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
     try {
-        $json = Build-ConfigJson
-        # Write without BOM — JSON.parse chokes on UTF-8 BOM
-        [System.IO.File]::WriteAllText($ConfigFile, $json, (New-Object System.Text.UTF8Encoding $false))
+        [System.IO.File]::WriteAllText($ConfigFile, $json, $utf8NoBom)
         Write-InstallLog "  Config written to: $ConfigFile"
     } catch {
-        Write-InstallLog "  ERROR: Failed to write config: $_"
+        # Program Files requires elevation — try elevated copy
+        Write-InstallLog "  Direct write failed, requesting elevation..."
+        try {
+            $tmpFile = [System.IO.Path]::GetTempFileName()
+            [System.IO.File]::WriteAllText($tmpFile, $json, $utf8NoBom)
+            $copyCmd = "Copy-Item -Path '$tmpFile' -Destination '$ConfigFile' -Force; Remove-Item '$tmpFile' -Force"
+            Start-Process powershell -ArgumentList "-NoProfile -Command `"$copyCmd`"" -Verb RunAs -Wait
+            Write-InstallLog "  Config written to: $ConfigFile (elevated)"
+        } catch {
+            Write-InstallLog "  ERROR: Failed to write config: $_"
+        }
     }
     $script:progressBar.Value = 65
 
