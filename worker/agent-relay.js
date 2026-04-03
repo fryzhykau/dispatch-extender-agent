@@ -345,17 +345,18 @@ function handleTask(msg) {
     `</user-task>`,
   ].filter(Boolean).join('\n');
 
-  claudeArgs.push(restrictionPrompt);
-
+  // Pass prompt via stdin to avoid OS command-line length limits
   const child = spawn(
     "claude",
     claudeArgs,
     {
       cwd,
       shell: false,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
     }
   );
+  child.stdin.write(restrictionPrompt);
+  child.stdin.end();
   runningChild = child;
 
   let stdout = "";

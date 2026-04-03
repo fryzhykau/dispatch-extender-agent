@@ -373,25 +373,22 @@ if (Test-Path $diagramPath) {
 
 New-StyledLabel -Parent $p0 -Text "Agents receive tasks from the orchestrator and run them`nusing Claude Code." -X 20 -Y 318 -Width 450 -Height 36 -Font $FontBody -ForeColor $ColorLightGray | Out-Null
 
-# Setup mode selection — group container to isolate radio buttons from step 2 radios
-$modeGroup = New-Object System.Windows.Forms.GroupBox
-$modeGroup.Location = New-Object System.Drawing.Point((S 20), (S 354))
-$modeGroup.Size = New-Object System.Drawing.Size((S 440), (S 50))
-$modeGroup.FlatStyle = "Flat"
-$modeGroup.ForeColor = $ColorDarkBg
-$modeGroup.BackColor = [System.Drawing.Color]::Transparent
-$modeGroup.Text = ""
-$p0.Controls.Add($modeGroup)
+# Setup mode selection — use Panel (not GroupBox) for clean look
+$modePanel = New-Object System.Windows.Forms.Panel
+$modePanel.Location = New-Object System.Drawing.Point((S 20), (S 354))
+$modePanel.Size = New-Object System.Drawing.Size((S 440), (S 46))
+$modePanel.BackColor = [System.Drawing.Color]::Transparent
+$p0.Controls.Add($modePanel)
 
-$script:radioBasicMode = New-StyledRadio -Parent $modeGroup -Text "Basic Setup (recommended)" -X 0 -Y 0 -Width 200 -Checked $true
-$script:radioAdvancedMode = New-StyledRadio -Parent $modeGroup -Text "Advanced Setup" -X 210 -Y 0 -Width 200
+$script:radioBasicMode = New-StyledRadio -Parent $modePanel -Text "Basic Setup (recommended)" -X 0 -Y 0 -Width 220 -Checked $true
+$script:radioAdvancedMode = New-StyledRadio -Parent $modePanel -Text "Advanced Setup" -X 230 -Y 0 -Width 200
 
-$script:lblModeDesc = New-StyledLabel -Parent $modeGroup -Text "Quick setup `u{2014} just agent name, shared secret, and connection. Uses sensible defaults." -X 0 -Y 22 -Width 440 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray
+$script:lblModeDesc = New-StyledLabel -Parent $modePanel -Text "Quick setup -- just agent name, shared secret, and connection." -X 0 -Y 22 -Width 440 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray
 
 $script:radioBasicMode.Add_CheckedChanged({
     if ($script:radioBasicMode.Checked) {
         $script:SetupMode = "basic"
-        $script:lblModeDesc.Text = "Quick setup `u{2014} just agent name, shared secret, and connection. Uses sensible defaults."
+        $script:lblModeDesc.Text = "Quick setup -- just agent name, shared secret, and connection."
         Rebuild-Sidebar
     }
 })
