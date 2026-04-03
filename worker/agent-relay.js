@@ -108,8 +108,9 @@ function connect() {
     }
   });
 
-  ws.on("close", () => {
-    log("WebSocket closed");
+  ws.on("close", (code, reason) => {
+    const reasonStr = reason ? reason.toString() : '';
+    log(`WebSocket closed (code: ${code}${reasonStr ? ', reason: ' + reasonStr : ''})`);
     scheduleReconnect();
   });
 

@@ -875,6 +875,18 @@ async function main() {
 
   // Start listening
   let discoveryHandle = null;
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`[relay] ERROR: Port ${PORT} is already in use.`);
+      console.error(`[relay] Another relay or application is using this port.`);
+      console.error(`[relay] To find it:  netstat -ano | findstr :${PORT}`);
+      console.error(`[relay] To kill it:  powershell -Command "Stop-Process -Id (Get-NetTCPConnection -LocalPort ${PORT}).OwningProcess -Force"`);
+    } else {
+      console.error(`[relay] ERROR: Failed to start server: ${err.message}`);
+    }
+    process.exit(1);
+  });
+
   server.listen(PORT, '0.0.0.0', async () => {
     console.log(`[relay] Ready — listening on 0.0.0.0:${PORT}`);
 
