@@ -1220,22 +1220,24 @@ function Run-Installation {
     try {
         $configJson | Set-Content -Path $configPath -Encoding UTF8 -Force
         Write-InstallLog "Configuration written to $configPath" "OK"
-    } catch [System.UnauthorizedAccessException] {
-        # Program Files requires elevation — use a temp file + elevated copy
-        Write-InstallLog "Elevation required for $configPath — requesting admin..." "INFO"
-        try {
-            $tmpFile = [System.IO.Path]::GetTempFileName()
-            $configJson | Set-Content -Path $tmpFile -Encoding UTF8 -Force
-            $copyCmd = "Copy-Item -Path '$tmpFile' -Destination '$configPath' -Force; Remove-Item '$tmpFile' -Force"
-            Start-Process powershell -ArgumentList "-NoProfile -Command `"$copyCmd`"" -Verb RunAs -Wait
-            Write-InstallLog "Configuration written to $configPath (elevated)" "OK"
-        } catch {
-            Write-InstallLog "Failed to write config even with elevation: $_" "FAIL"
+    } catch {
+        if ($_.Exception -is [System.UnauthorizedAccessException]) {
+            # Program Files requires elevation
+            Write-InstallLog "Elevation required for $configPath - requesting admin..." "INFO"
+            try {
+                $tmpFile = [System.IO.Path]::GetTempFileName()
+                $configJson | Set-Content -Path $tmpFile -Encoding UTF8 -Force
+                $copyCmd = "Copy-Item -Path '$tmpFile' -Destination '$configPath' -Force; Remove-Item '$tmpFile' -Force"
+                Start-Process powershell -ArgumentList "-NoProfile -Command `"$copyCmd`"" -Verb RunAs -Wait
+                Write-InstallLog "Configuration written to $configPath (elevated)" "OK"
+            } catch {
+                Write-InstallLog "Failed to write config even with elevation: $_" "FAIL"
+                return $false
+            }
+        } else {
+            Write-InstallLog "Failed to write config: $_" "FAIL"
             return $false
         }
-    } catch {
-        Write-InstallLog "Failed to write config: $_" "FAIL"
-        return $false
     }
     & $advanceProgress
 
@@ -1371,11 +1373,8 @@ function Run-Installation {
 
             # Write a temp .cmd launcher to avoid nested quoting issues with cmd /C
             $launcherFile = Join-Path $logsDir "$processName-launcher.cmd"
-            @"
-@echo off
-cd /d "$ProjectRoot"
-"$nodePath" "$entryScript" > "$logFile" 2> "$errFile"
-"@ | Set-Content -Path $launcherFile -Encoding ASCII -Force
+            $launcherContent = "@echo off`r`ncd /d `"$ProjectRoot`"`r`n`"$nodePath`" `"$entryScript`" > `"$logFile`" 2> `"$errFile`""
+            $launcherContent | Set-Content -Path $launcherFile -Encoding ASCII -Force
             Start-Process -FilePath "cmd.exe" -ArgumentList "/C `"$launcherFile`"" `
                 -WindowStyle Hidden | Out-Null
 
