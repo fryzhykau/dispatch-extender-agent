@@ -228,6 +228,21 @@ From your phone, you can say things like:
 
 The coordinator automatically matches task keywords to agent capabilities when deciding where to route subtasks.
 
+## Orchestrate Skill (Claude Code Custom Command)
+
+The project includes a custom Claude Code command at `.claude/commands/orchestrate.md` that teaches Claude the full orchestration protocol. When invoked via `/orchestrate`, Claude knows how to:
+
+1. Check `/status` for available agents
+2. Decompose tasks and match them to agent capabilities
+3. Submit subtasks via `POST /task` with PIN authentication
+4. Poll `/task/:id` every 10 seconds until completion
+5. Retry failed subtasks on different agents (once)
+6. Aggregate results into a single response (under 300 words for phone/Dispatch)
+
+This is what makes the Dispatch integration work — without it, Claude on the coordinator machine wouldn't know the relay exists or how to use it.
+
+The orchestrator setup wizard automatically detects the skill during installation. If you cloned the repo directly, it's already in place.
+
 ## Security
 
 ### Multi-Layer Authentication
@@ -591,7 +606,7 @@ The uninstaller automatically stops and removes Windows services, deletes `node_
 All tests must pass before pushing to any branch:
 
 ```bash
-npm test             # Run all 237 tests (unit, integration, static analysis, security)
+npm test             # Run all 252 tests (unit, integration, static analysis, security)
 npm run pii-check    # Scan for personal information in source code
 npm run precommit    # Runs both pii-check and tests
 ```
@@ -611,6 +626,7 @@ npm run precommit    # Runs both pii-check and tests
 | Queue | `test/queue.test.js` | 13 | Task queuing, drain on idle, max size limits |
 | Discovery | `test/discovery.test.js` | 4 | UDP broadcast, HMAC signing, virtual IP filtering, stop behavior |
 | PS Syntax & Static Analysis | `test/powershell-syntax.test.js` | 76 | Syntax validation (10 scripts), MessageBox leaks, Join-Path args, here-strings, [char] overflow, BOM detection, switch/return bugs, security checks |
+| Orchestrate Skill | `test/orchestrate-skill.test.js` | 15 | Skill file existence, protocol steps, API endpoints, security guidance, setup wizard deployment |
 
 The server integration tests spawn a real relay process on port 7099 with a temporary config, so they validate the full stack end-to-end. The PowerShell static analysis tests catch common PS 5.1 pitfalls without executing the scripts.
 

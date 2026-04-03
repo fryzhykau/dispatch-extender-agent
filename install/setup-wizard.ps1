@@ -1516,6 +1516,19 @@ function Run-Installation {
     }
     & $advanceProgress
 
+    # --- Step: Deploy orchestrate skill (coordinator only) ---
+    if ($role -eq "coordinator") {
+        Write-InstallLog "Deploying orchestrate skill for Claude Code..." "INFO"
+        $skillDir = Join-Path (Join-Path $ProjectRoot ".claude") "commands"
+        $skillSource = Join-Path $skillDir "orchestrate.md"
+        if (Test-Path $skillSource) {
+            Write-InstallLog "Orchestrate skill available at $skillDir" "OK"
+            Write-InstallLog "Use /orchestrate in Claude Code to dispatch tasks across agents." "INFO"
+        } else {
+            Write-InstallLog "Orchestrate skill not found in .claude/commands/ - skipped." "SKIP"
+        }
+    }
+
     # --- Step: TLS certs ---
     if ($doTls) {
         Write-InstallLog "Generating TLS certificates..." "INFO"
