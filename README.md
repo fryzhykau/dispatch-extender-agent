@@ -2,21 +2,13 @@
 
 > **Platform: Windows only.** This project is built and tested exclusively on Windows (10/11). Service installation uses NSSM and PowerShell, sleep prevention uses the Win32 `SetThreadExecutionState` API, and paths assume Windows conventions. It has **not been tested** on macOS or Linux. Contributions to add cross-platform support are welcome.
 
-Extends Anthropic's [Dispatch](https://docs.anthropic.com/en/docs/claude-code/dispatch) (phone to one desktop) into a hub-and-spoke model: your phone dispatches tasks through a coordinator machine, which routes subtasks to one or more named worker agents over a local WebSocket relay.
+Extends Anthropic's [Dispatch](https://docs.anthropic.com/en/docs/claude-code/dispatch) (phone to one desktop) into a hub-and-spoke model: your phone dispatches tasks through an orchestrator machine, which routes subtasks to one or more named worker agents over a local WebSocket relay.
 
-```
-Phone (Claude App)
-  │
-  ▼
-Coordinator (Machine 1)          Relay Server (port 7070)
-  Claude Desktop + Dispatch  ──▶  WebSocket + HTTP API
-                                    │          │
-                              ┌─────┘          └─────┐
-                              ▼                      ▼
-                        Worker "CodeBot"       Worker "ResearchBot"
-                        (Machine 2)            (Machine 3)
-                        claude --print         claude --print
-```
+![Architecture Diagram](logo/integration-diagram-simple.png)
+
+Each agent machine runs a lightweight worker that connects to the orchestrator's relay:
+
+![Agent Connection](logo/agent-diagram-simple.png)
 
 ## What This Enables (Beyond Standard Dispatch)
 
@@ -152,8 +144,8 @@ install/
 
 ### Communication Flow
 
-1. **Phone** sends a task via Claude Dispatch to the coordinator
-2. **Coordinator** decomposes the task, calls `POST /task` on the relay for each subtask
+1. **Phone** sends a task via Claude Dispatch to the orchestrator
+2. **Orchestrator** decomposes the task, calls `POST /task` on the relay for each subtask
 3. **Relay** routes each subtask to the target worker via WebSocket
 4. **Worker** spawns `claude --print --dangerously-skip-permissions "<prompt>"` and captures output
 5. **Worker** sends the result back through the relay
@@ -560,7 +552,7 @@ The uninstaller automatically stops and removes Windows services, deletes `node_
 All tests must pass before pushing to any branch:
 
 ```bash
-npm test             # Run all 129 tests (unit + integration)
+npm test             # Run all 210 tests (unit, integration, static analysis, security)
 npm run pii-check    # Scan for personal information in source code
 npm run precommit    # Runs both pii-check and tests
 ```
@@ -578,9 +570,10 @@ npm run precommit    # Runs both pii-check and tests
 | Keep Awake | `test/keep-awake.test.js` | 5 | Sleep prevention API, enable/disable, UInt32 safety |
 | Audit | `test/audit.test.js` | 9 | Structured JSONL logging, levels, rotation |
 | Queue | `test/queue.test.js` | 13 | Task queuing, drain on idle, max size limits |
-| Discovery | `test/discovery.test.js` | 4 | UDP broadcast, message format, virtual IP filtering, stop behavior |
+| Discovery | `test/discovery.test.js` | 4 | UDP broadcast, HMAC signing, virtual IP filtering, stop behavior |
+| PS Syntax & Static Analysis | `test/powershell-syntax.test.js` | 76 | Syntax validation (10 scripts), MessageBox leaks, Join-Path args, here-strings, [char] overflow, BOM detection, switch/return bugs, security checks |
 
-The server integration tests spawn a real relay process on port 7099 with a temporary config, so they validate the full stack end-to-end.
+The server integration tests spawn a real relay process on port 7099 with a temporary config, so they validate the full stack end-to-end. The PowerShell static analysis tests catch common PS 5.1 pitfalls without executing the scripts.
 
 ## Troubleshooting
 
