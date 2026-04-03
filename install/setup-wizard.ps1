@@ -846,35 +846,43 @@ $p7 = New-Object System.Windows.Forms.Panel
 $p7.Dock = "Fill"
 $p7.BackColor = $C_BG
 
-$script:lblCompleteIcon = New-StyledLabel -Text "" -X 200 -Y 20 -Width 60 -Height 50 -Font (New-Object System.Drawing.Font("Segoe UI", 32)) -Color $C_SUCCESS
+$script:lblCompleteIcon = New-StyledLabel -Text "" -X 200 -Y 8 -Width 60 -Height 40 -Font (New-Object System.Drawing.Font("Segoe UI", 26)) -Color $C_SUCCESS
 $p7.Controls.Add($script:lblCompleteIcon)
 
-$script:lblCompleteTitle = New-StyledLabel -Text "Setup Complete!" -X 20 -Y 75 -Width 460 -Height 36 -Font $F_TITLE -Color $C_SUCCESS
+$script:lblCompleteTitle = New-StyledLabel -Text "Setup Complete!" -X 20 -Y 46 -Width 460 -Height 30 -Font $F_TITLE -Color $C_SUCCESS
 $script:lblCompleteTitle.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
 $p7.Controls.Add($script:lblCompleteTitle)
 
-$script:lblCompleteSummary = New-StyledLabel -Text "" -X 20 -Y 120 -Width 460 -Height 100 -Font $F_NORMAL -Color $C_TEXTDIM
+$script:lblCompleteSummary = New-StyledLabel -Text "" -X 20 -Y 80 -Width 460 -Height 60 -Font $F_NORMAL -Color $C_TEXTDIM
 $p7.Controls.Add($script:lblCompleteSummary)
 
-$script:lblWhatsNext = New-StyledLabel -Text "" -X 20 -Y 226 -Width 460 -Height 150 -Font $F_NORMAL
-$p7.Controls.Add($script:lblWhatsNext)
+# Scrollable "What's next" area
+$script:txtWhatsNext = New-Object System.Windows.Forms.TextBox
+$script:txtWhatsNext.Multiline = $true
+$script:txtWhatsNext.ReadOnly = $true
+$script:txtWhatsNext.ScrollBars = "Vertical"
+$script:txtWhatsNext.Location = New-Object System.Drawing.Point((S 20), (S 148))
+$script:txtWhatsNext.Size = New-Object System.Drawing.Size((S 460), (S 210))
+$script:txtWhatsNext.Font = $F_NORMAL
+$script:txtWhatsNext.BackColor = $C_PANEL
+$script:txtWhatsNext.ForeColor = $C_TEXT
+$script:txtWhatsNext.BorderStyle = "FixedSingle"
+$p7.Controls.Add($script:txtWhatsNext)
 
-$btnOpenDash = New-StyledButton -Text "Open Dashboard" -X 20 -Y 390 -Width 140 -Height 34 -BGColor $C_HIGHLIGHT
-$btnOpenDash.Add_Click({
-    $port = if ($script:SelectedRole -eq "coordinator") { $script:txtPort.Text } else { "7070" }
-    $proto = if ($script:cbEnableTLS.Checked) { "https" } else { "http" }
-    Start-Process "$proto`://localhost:$port/dashboard"
-})
-$p7.Controls.Add($btnOpenDash)
+$script:cbStartRelay = New-StyledCheckBox -Text "Start the Relay and open the Dashboard" -X 20 -Y 368 -Width 350 -Checked $true
+$p7.Controls.Add($script:cbStartRelay)
 
-$btnViewLogs = New-StyledButton -Text "View Logs" -X 170 -Y 390 -Width 120 -Height 34
+$btnViewLogs = New-StyledButton -Text "View Logs" -X 380 -Y 366 -Width 100 -Height 30
 $btnViewLogs.Add_Click({
-    $logsDir = Join-Path $ProjectRoot "logs"
-    if (Test-Path $logsDir) {
-        Start-Process "explorer.exe" $logsDir
-    } else {
-        Start-Process "explorer.exe" $ProjectRoot
+    # Logs are in ProgramData when installed to Program Files
+    $logsDir = Join-Path (Join-Path $env:ProgramData "DispatchOrchestrator") "logs"
+    if (-not (Test-Path $logsDir)) {
+        $logsDir = Join-Path $ProjectRoot "logs"
     }
+    if (-not (Test-Path $logsDir)) {
+        New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
+    }
+    Start-Process "explorer.exe" $logsDir
 })
 $p7.Controls.Add($btnViewLogs)
 
@@ -1217,24 +1225,21 @@ function Run-Installation {
         $configPath = Join-Path (Join-Path $ProjectRoot "worker") "worker-config.json"
         Write-InstallLog "Writing worker/worker-config.json..." "INFO"
     }
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
     try {
-        $configJson | Set-Content -Path $configPath -Encoding UTF8 -Force
+        # Try direct write first (works outside Program Files)
+        [System.IO.File]::WriteAllText($configPath, $configJson, $utf8NoBom)
         Write-InstallLog "Configuration written to $configPath" "OK"
     } catch {
-        if ($_.Exception -is [System.UnauthorizedAccessException]) {
-            # Program Files requires elevation
-            Write-InstallLog "Elevation required for $configPath - requesting admin..." "INFO"
-            try {
-                $tmpFile = [System.IO.Path]::GetTempFileName()
-                $configJson | Set-Content -Path $tmpFile -Encoding UTF8 -Force
-                $copyCmd = "Copy-Item -Path '$tmpFile' -Destination '$configPath' -Force; Remove-Item '$tmpFile' -Force"
-                Start-Process powershell -ArgumentList "-NoProfile -Command `"$copyCmd`"" -Verb RunAs -Wait
-                Write-InstallLog "Configuration written to $configPath (elevated)" "OK"
-            } catch {
-                Write-InstallLog "Failed to write config even with elevation: $_" "FAIL"
-                return $false
-            }
-        } else {
+        # Any write failure — try elevated copy (Program Files needs admin)
+        Write-InstallLog "Direct write failed, requesting elevation..." "INFO"
+        try {
+            $tmpFile = [System.IO.Path]::GetTempFileName()
+            [System.IO.File]::WriteAllText($tmpFile, $configJson, $utf8NoBom)
+            $copyCmd = "Copy-Item -Path '$tmpFile' -Destination '$configPath' -Force; Remove-Item '$tmpFile' -Force"
+            Start-Process powershell -ArgumentList "-NoProfile -Command `"$copyCmd`"" -Verb RunAs -Wait
+            Write-InstallLog "Configuration written to $configPath (elevated)" "OK"
+        } catch {
             Write-InstallLog "Failed to write config: $_" "FAIL"
             return $false
         }
@@ -1495,7 +1500,7 @@ $btnNext.Add_Click({
                 $svcInstalled = $script:cbInstallService.Checked
                 $script:lblCompleteSummary.Text = "Your machine has been configured as the Orchestrator.`nThe relay server is configured on port $port.`nShared secret has been set in relay/config.json."
                 if ($svcInstalled) {
-                    $script:lblWhatsNext.Text = "What's next:`n`n" +
+                    $script:txtWhatsNext.Text = "What's next:`n`n" +
                         "  - The relay is running as a Windows service (starts on boot)`n" +
                         "  - Open the dashboard at $proto`://localhost:$port/dashboard`n" +
                         "  - Install agents on other machines and point them to this orchestrator`n`n" +
@@ -1503,7 +1508,7 @@ $btnNext.Add_Click({
                         "  When prompted, enter your shared secret as the Bearer token.`n" +
                         "  Your shared secret is: $secretHint"
                 } else {
-                    $script:lblWhatsNext.Text = "What's next:`n`n" +
+                    $script:txtWhatsNext.Text = "What's next:`n`n" +
                         "  - The relay has been started in the background`n" +
                         "  - Open the dashboard at $proto`://localhost:$port/dashboard`n" +
                         "  - Install agents on other machines and point them to this orchestrator`n" +
@@ -1520,7 +1525,7 @@ $btnNext.Add_Click({
                 $svcInstalled = $script:cbInstallService.Checked
                 $script:lblCompleteSummary.Text = "Your machine has been configured as Worker '$agentName'.`nCoordinator: $coordHost`nConfiguration saved to worker/worker-config.json."
                 if ($svcInstalled) {
-                    $script:lblWhatsNext.Text = "What's next:`n`n" +
+                    $script:txtWhatsNext.Text = "What's next:`n`n" +
                         "  - The worker is running as a Windows service (starts on boot)`n" +
                         "  - Ensure the coordinator is running`n" +
                         "  - Your agent '$agentName' will connect automatically`n`n" +
@@ -1529,7 +1534,7 @@ $btnNext.Add_Click({
                         "  When prompted, enter your shared secret as the Bearer token.`n" +
                         "  Your shared secret is: $secretHint"
                 } else {
-                    $script:lblWhatsNext.Text = "What's next:`n`n" +
+                    $script:txtWhatsNext.Text = "What's next:`n`n" +
                         "  - The worker has been started in the background`n" +
                         "  - Ensure the coordinator is running`n" +
                         "  - Your agent '$agentName' will connect automatically`n" +
@@ -1553,7 +1558,15 @@ $btnNext.Add_Click({
     }
 
     if ($step -eq 6) {
-        # Finish
+        # Finish — launch relay + dashboard if checkbox is checked
+        if ($script:cbStartRelay -and $script:cbStartRelay.Checked) {
+            $port = if ($script:SelectedRole -eq "coordinator") { $script:txtPort.Text } else { "7070" }
+            $proto = if ($script:cbEnableTLS.Checked) { "https" } else { "http" }
+            $cmdArgs = "/K title Dispatch Relay & node relay/server.js"
+            Start-Process cmd.exe -ArgumentList $cmdArgs -WorkingDirectory $ProjectRoot -WindowStyle Minimized
+            Start-Sleep -Seconds 3
+            Start-Process "$proto`://localhost:$port/dashboard"
+        }
         $form.Close()
         return
     }

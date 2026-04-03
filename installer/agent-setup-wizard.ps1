@@ -813,7 +813,8 @@ function Run-Install {
     Write-InstallLog "Writing worker-config.json..."
     try {
         $json = Build-ConfigJson
-        $json | Set-Content -Path $ConfigFile -Encoding UTF8 -Force
+        # Write without BOM — JSON.parse chokes on UTF-8 BOM
+        [System.IO.File]::WriteAllText($ConfigFile, $json, (New-Object System.Text.UTF8Encoding $false))
         Write-InstallLog "  Config written to: $ConfigFile"
     } catch {
         Write-InstallLog "  ERROR: Failed to write config: $_"

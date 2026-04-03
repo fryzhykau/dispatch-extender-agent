@@ -156,12 +156,7 @@ Filename: "powershell.exe"; \
   WorkingDir: "{app}"; Description: "Launch the Setup Wizard now"; \
   Flags: postinstall skipifsilent waituntilterminated
 
-; Start the relay and open the dashboard (single checkbox)
-Filename: "powershell.exe"; \
-  Parameters: "-ExecutionPolicy Bypass -File ""{app}\installer\launch-dashboard.ps1"""; \
-  WorkingDir: "{app}"; \
-  Description: "Start the Relay and open the Dashboard"; \
-  Flags: nowait postinstall skipifsilent unchecked; Check: NodeJsInstalled
+; Dashboard launch is handled by the setup wizard's Complete page button
 
 ; --------------------------------------------------------------------------
 ; Uninstall actions — clean up Windows services
