@@ -389,6 +389,18 @@ describe('JavaScript security checks', () => {
       'Relay should detect data exfiltration attempts');
   });
 
+  it('worker should pass allowedTools/disallowedTools to Claude CLI', () => {
+    const content = readFileSync(join(projectRoot, 'worker', 'agent-relay.js'), 'utf-8');
+    assert.ok(content.includes('--allowedTools'), 'Worker should pass --allowedTools flag');
+    assert.ok(content.includes('--disallowedTools'), 'Worker should pass --disallowedTools flag');
+  });
+
+  it('worker config template should include allowedTools', () => {
+    const config = JSON.parse(readFileSync(join(projectRoot, 'worker', 'worker-config.json'), 'utf-8'));
+    assert.ok(Array.isArray(config.allowedTools), 'allowedTools should be an array');
+    assert.ok(config.allowedTools.length > 0, 'allowedTools should have default tools');
+  });
+
   it('worker should support --config flag for multiple agents', () => {
     const content = readFileSync(join(projectRoot, 'worker', 'agent-relay.js'), 'utf-8');
     assert.ok(content.includes('--config'), 'Worker should accept --config flag');

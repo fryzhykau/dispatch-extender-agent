@@ -29,6 +29,8 @@ let coordinatorHost = config.coordinatorHost;
 const tlsConfig = config.tls || { enabled: false };
 const discoveryConfig = config.discovery || { enabled: false };
 const MAX_OUTPUT_LENGTH = config.maxOutputLength ?? 1000000;
+const allowedTools = config.allowedTools || [];
+const disallowedTools = config.disallowedTools || [];
 
 // ---------------------------------------------------------------------------
 // State
@@ -293,12 +295,20 @@ function handleTask(msg) {
 
   log(`Starting task ${taskId} in ${cwd}`);
 
-  // Build Claude CLI arguments with directory restrictions
+  // Build Claude CLI arguments with directory and tool restrictions
   const claudeArgs = ["--print", "--permission-mode", "auto"];
 
   // Add allowed directories
   for (const dir of (allowedDirs || [])) {
     claudeArgs.push("--add-dir", dir);
+  }
+
+  // Add tool permissions
+  if (allowedTools.length > 0) {
+    claudeArgs.push("--allowedTools", ...allowedTools);
+  }
+  if (disallowedTools.length > 0) {
+    claudeArgs.push("--disallowedTools", ...disallowedTools);
   }
 
   // Build a hardened prompt with clear system/user boundaries

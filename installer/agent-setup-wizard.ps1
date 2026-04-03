@@ -663,10 +663,21 @@ if (-not $nssmAvailable) {
 
 $script:chkStartAfter = New-StyledCheckBox -Parent $p4 -Text "Start agent after setup completes" -X 20 -Y 214 -Width 430 -Checked $true
 
-New-StyledLabel -Parent $p4 -Text "Max Output Size" -X 20 -Y 264 -Width 200 -Height 20 -Font $FontLabel | Out-Null
+New-StyledLabel -Parent $p4 -Text "Allowed Tools" -X 20 -Y 254 -Width 200 -Height 20 -Font $FontLabel | Out-Null
+New-StyledLabel -Parent $p4 -Text "Which Claude tools this agent may use" -X 20 -Y 274 -Width 400 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+
+$script:chkToolBrowser  = New-StyledCheckBox -Parent $p4 -Text "Browser (WebFetch, WebSearch)" -X 20 -Y 294 -Width 220 -Checked $true
+$script:chkToolCode     = New-StyledCheckBox -Parent $p4 -Text "Code (Read, Edit, Write)" -X 250 -Y 294 -Width 200 -Checked $true
+$script:chkToolBash     = New-StyledCheckBox -Parent $p4 -Text "Shell (Bash commands)" -X 20 -Y 318 -Width 220 -Checked $true
+$script:chkToolCustom   = New-StyledCheckBox -Parent $p4 -Text "Custom:" -X 250 -Y 318 -Width 70
+$script:txtCustomTools  = New-StyledTextBox -Parent $p4 -Text "" -X 326 -Y 318 -Width 130
+$script:txtCustomTools.Enabled = $false
+$script:chkToolCustom.Add_CheckedChanged({ $script:txtCustomTools.Enabled = $script:chkToolCustom.Checked })
+
+New-StyledLabel -Parent $p4 -Text "Max Output Size" -X 20 -Y 358 -Width 200 -Height 20 -Font $FontLabel | Out-Null
 $script:cmbMaxOutput = New-Object System.Windows.Forms.ComboBox
 $script:cmbMaxOutput.DropDownStyle = "DropDownList"
-$script:cmbMaxOutput.Location = New-Object System.Drawing.Point((S 20), (S 288))
+$script:cmbMaxOutput.Location = New-Object System.Drawing.Point((S 20), (S 380))
 $script:cmbMaxOutput.Size = New-Object System.Drawing.Size((S 180), (S 28))
 $script:cmbMaxOutput.Font = $FontBody
 $script:cmbMaxOutput.BackColor = $ColorInputBg
@@ -675,7 +686,7 @@ $script:cmbMaxOutput.FlatStyle = "Flat"
 $script:cmbMaxOutput.Items.AddRange(@("100 KB", "500 KB", "1 MB", "5 MB", "10 MB"))
 $script:cmbMaxOutput.SelectedIndex = 2  # 1 MB default
 $p4.Controls.Add($script:cmbMaxOutput)
-New-StyledLabel -Parent $p4 -Text "Max task output returned to the orchestrator" -X 210 -Y 290 -Width 240 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+New-StyledLabel -Parent $p4 -Text "Max task output returned to the orchestrator" -X 210 -Y 382 -Width 240 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
 $panels[4] = $p4
 
@@ -923,6 +934,8 @@ function Collect-Config {
         $script:Config.installService = $false
         $script:Config.startAfterSetup = $true
         $script:Config.maxOutputLength = 1000000
+        $script:Config.allowedTools = @("Read", "Edit", "Write", "Bash", "Glob", "Grep", "WebFetch", "WebSearch")
+        $script:Config.disallowedTools = @()
     } else {
         # Advanced mode: read from all panels
         $script:Config.agentName = $script:txtAgentName.Text.Trim()
@@ -962,6 +975,17 @@ function Collect-Config {
         } else {
             $script:Config.maxOutputLength = 1000000
         }
+
+        # Collect allowed tools from checkboxes
+        $tools = @()
+        if ($script:chkToolCode.Checked)    { $tools += "Read"; $tools += "Edit"; $tools += "Write"; $tools += "Glob"; $tools += "Grep" }
+        if ($script:chkToolBash.Checked)    { $tools += "Bash" }
+        if ($script:chkToolBrowser.Checked) { $tools += "WebFetch"; $tools += "WebSearch" }
+        if ($script:chkToolCustom.Checked -and $script:txtCustomTools.Text.Trim() -ne "") {
+            $tools += @(($script:txtCustomTools.Text -split ",") | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
+        }
+        $script:Config.allowedTools = $tools
+        $script:Config.disallowedTools = @()
     }
 }
 
@@ -995,6 +1019,8 @@ function Build-ConfigJson {
             broadcastPort = 7071
             timeoutMs     = 15000
         }
+        allowedTools       = $c.allowedTools
+        disallowedTools    = $c.disallowedTools
         maxOutputLength    = $c.maxOutputLength
         keepAwake          = [ordered]@{
             enabled = $c.keepAwake

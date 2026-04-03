@@ -26,6 +26,8 @@
     "broadcastPort": 7071,
     "timeoutMs": 15000
   },
+  "allowedTools": ["Read", "Edit", "Write", "Bash", "Glob", "Grep", "WebFetch", "WebSearch"],
+  "disallowedTools": [],
   "maxOutputLength": 1000000,
   "keepAwake": {
     "enabled": true
