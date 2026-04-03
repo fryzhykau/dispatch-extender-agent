@@ -488,13 +488,13 @@
 <div class="setup-banner" id="setupBanner">
   <button class="dismiss" id="dismissBanner" title="Dismiss">&times;</button>
   <h2>First-Time Setup Required</h2>
-  <p>The dashboard needs your <strong>shared secret</strong> (Bearer token) to communicate with the relay API.</p>
+  <p>The dashboard needs your <strong>shared secret</strong> to communicate with the relay API.</p>
   <ol>
     <li>Find your shared secret in <code>relay/config.json</code> &rarr; <code>"sharedSecret"</code> field</li>
     <li>Paste it below and click <strong>Connect</strong></li>
     <li>The dashboard will save it and start loading data automatically</li>
   </ol>
-  <p style="color:#8892a4; font-size:0.85rem;">You can also change this later via the gear icon &#9881; in the top-right corner.</p>
+  <p style="color:#8892a4; font-size:0.85rem;">This is the same secret you'll need when setting up agents on other machines. You can view or copy it later via the gear icon &#9881; in the top-right corner.</p>
   <div class="quick-setup">
     <input type="text" id="quickTokenInput" placeholder="Paste your shared secret here...">
     <button class="btn" id="quickConnectBtn" style="background:#e94560; border-color:#e94560;">Connect</button>
@@ -507,8 +507,9 @@
     <h2>Settings</h2>
     <label for="relayUrlInput">Relay URL</label>
     <input type="text" id="relayUrlInput" value="http://localhost:7070">
-    <label for="tokenInput">Bearer Token</label>
+    <label for="tokenInput">Shared Secret (Bearer Token)</label>
     <input type="text" id="tokenInput" placeholder="Shared secret for API auth">
+    <p style="color:var(--text-dim); font-size:0.8rem; margin:4px 0 8px 0;">This is the same secret agents need to connect. Copy it from here when setting up new agents.</p>
     <div class="actions">
       <button class="btn" id="settingsCancelBtn">Cancel</button>
       <button class="btn" id="settingsSaveBtn" style="background:var(--highlight)">Save</button>
