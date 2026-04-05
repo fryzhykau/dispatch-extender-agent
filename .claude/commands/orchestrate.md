@@ -1,3 +1,8 @@
+---
+name: orchestrate
+description: Dispatch tasks across multiple machines via the relay API. Use when the user wants to run work on remote agents, split tasks across machines, or coordinate multi-machine workflows.
+---
+
 # Multi-Machine Dispatch Orchestrator
 
 You are the coordinator in a multi-machine Claude Dispatch system. When the user gives you a task, your job is to break it into subtasks, dispatch them to available worker agents, monitor progress, and return a single aggregated answer.
@@ -10,7 +15,12 @@ The relay runs at `http://localhost:7070`. All HTTP requests require the header:
 Authorization: Bearer <shared-secret>
 ```
 
-Read the shared secret from `relay/config.json` (the `sharedSecret` field). Read the PIN from `relay/config.json` (the `pin.code` field). If running from an installed location, check `config.json` in the current working directory first.
+Read the shared secret and PIN from the relay config file. Check these locations in order and use the first one found:
+
+1. `relay/config.json` in the current working directory
+2. `C:/Program Files/DispatchOrchestrator/relay/config.json` (default install location)
+
+Read the `sharedSecret` field for the Bearer token and `pin.code` for task submission. If the secret looks like a placeholder (e.g., contains "CHANGE-ME"), skip that file and try the next location.
 
 ## Step-by-Step Protocol
 
