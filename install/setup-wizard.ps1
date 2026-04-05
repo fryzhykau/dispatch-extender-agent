@@ -1852,35 +1852,26 @@ $btnNext.Add_Click({
                 if ($svcInstalled) {
                     $script:txtWhatsNext.Text = `
                         "NEXT STEPS`r`n" +
-                        "---------------------------------------`r`n" +
-                        "1. The relay is running as a Windows`r`n" +
-                        "   service (starts automatically on boot)`r`n`r`n" +
-                        "2. Open the dashboard:`r`n" +
-                        "   $proto`://localhost:$port/dashboard`r`n`r`n" +
-                        "3. Install agents on other machines and`r`n" +
-                        "   point them to this orchestrator`r`n`r`n" +
+                        "----------------------------------------------------`r`n`r`n" +
+                        "1.  The relay is running as a Windows service (starts automatically on boot)`r`n`r`n" +
+                        "2.  Open the dashboard: $proto`://localhost:$port/dashboard`r`n`r`n" +
+                        "3.  Install agents on other machines and point them to this orchestrator`r`n`r`n`r`n" +
                         "DASHBOARD LOGIN`r`n" +
-                        "---------------------------------------`r`n" +
-                        "When prompted, enter your shared secret`r`n" +
-                        "as the Bearer token:`r`n`r`n" +
-                        "  $secretHint`r`n"
+                        "----------------------------------------------------`r`n`r`n" +
+                        "When prompted, enter your shared secret as the Bearer token:`r`n`r`n" +
+                        "    $secretHint`r`n"
                 } else {
                     $script:txtWhatsNext.Text = `
                         "NEXT STEPS`r`n" +
-                        "---------------------------------------`r`n" +
-                        "1. The relay has been started in the`r`n" +
-                        "   background`r`n`r`n" +
-                        "2. Open the dashboard:`r`n" +
-                        "   $proto`://localhost:$port/dashboard`r`n`r`n" +
-                        "3. Install agents on other machines and`r`n" +
-                        "   point them to this orchestrator`r`n`r`n" +
-                        "4. To restart later:`r`n" +
-                        "   npm run relay`r`n`r`n" +
+                        "----------------------------------------------------`r`n`r`n" +
+                        "1.  The relay has been started in the background`r`n`r`n" +
+                        "2.  Open the dashboard: $proto`://localhost:$port/dashboard`r`n`r`n" +
+                        "3.  Install agents on other machines and point them to this orchestrator`r`n`r`n" +
+                        "4.  To restart later: npm run relay`r`n`r`n`r`n" +
                         "DASHBOARD LOGIN`r`n" +
-                        "---------------------------------------`r`n" +
-                        "When prompted, enter your shared secret`r`n" +
-                        "as the Bearer token:`r`n`r`n" +
-                        "  $secretHint`r`n"
+                        "----------------------------------------------------`r`n`r`n" +
+                        "When prompted, enter your shared secret as the Bearer token:`r`n`r`n" +
+                        "    $secretHint`r`n"
                 }
             } else {
                 $agentName = $script:txtAgentName.Text
@@ -1892,35 +1883,26 @@ $btnNext.Add_Click({
                 if ($svcInstalled) {
                     $script:txtWhatsNext.Text = `
                         "NEXT STEPS`r`n" +
-                        "---------------------------------------`r`n" +
-                        "1. The worker is running as a Windows`r`n" +
-                        "   service (starts automatically on boot)`r`n`r`n" +
-                        "2. Ensure the coordinator is running`r`n`r`n" +
-                        "3. Your agent '$agentName' will connect`r`n" +
-                        "   automatically`r`n`r`n" +
+                        "----------------------------------------------------`r`n`r`n" +
+                        "1.  The worker is running as a Windows service (starts automatically on boot)`r`n`r`n" +
+                        "2.  Ensure the coordinator is running`r`n`r`n" +
+                        "3.  Your agent '$agentName' will connect automatically`r`n`r`n`r`n" +
                         "DASHBOARD LOGIN`r`n" +
-                        "---------------------------------------`r`n" +
-                        "Open the coordinator's dashboard.`r`n" +
-                        "When prompted, enter your shared secret`r`n" +
-                        "as the Bearer token:`r`n`r`n" +
-                        "  $secretHint`r`n"
+                        "----------------------------------------------------`r`n`r`n" +
+                        "Open the coordinator's dashboard. When prompted, enter your shared secret as the Bearer token:`r`n`r`n" +
+                        "    $secretHint`r`n"
                 } else {
                     $script:txtWhatsNext.Text = `
                         "NEXT STEPS`r`n" +
-                        "---------------------------------------`r`n" +
-                        "1. The worker has been started in the`r`n" +
-                        "   background`r`n`r`n" +
-                        "2. Ensure the coordinator is running`r`n`r`n" +
-                        "3. Your agent '$agentName' will connect`r`n" +
-                        "   automatically`r`n`r`n" +
-                        "4. To restart later:`r`n" +
-                        "   npm run worker`r`n`r`n" +
+                        "----------------------------------------------------`r`n`r`n" +
+                        "1.  The worker has been started in the background`r`n`r`n" +
+                        "2.  Ensure the coordinator is running`r`n`r`n" +
+                        "3.  Your agent '$agentName' will connect automatically`r`n`r`n" +
+                        "4.  To restart later: npm run worker`r`n`r`n`r`n" +
                         "DASHBOARD LOGIN`r`n" +
-                        "---------------------------------------`r`n" +
-                        "Open the coordinator's dashboard.`r`n" +
-                        "When prompted, enter your shared secret`r`n" +
-                        "as the Bearer token:`r`n`r`n" +
-                        "  $secretHint`r`n"
+                        "----------------------------------------------------`r`n`r`n" +
+                        "Open the coordinator's dashboard. When prompted, enter your shared secret as the Bearer token:`r`n`r`n" +
+                        "    $secretHint`r`n"
                 }
             }
 
