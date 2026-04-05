@@ -15,7 +15,7 @@ The relay runs at `http://localhost:7070`. All HTTP requests require the header:
 Authorization: Bearer <shared-secret>
 ```
 
-**Finding the shared secret and PIN:** The installer bakes these values into this file during setup. If you see `<shared-secret>` above (not a real token), the skill was not installed via the setup wizard. In that case, read the `sharedSecret` field from `relay/config.json` (check the current directory first, then `C:/Program Files/DispatchOrchestrator/relay/config.json`). Skip files where the secret contains "CHANGE-ME".
+**Finding the shared secret and PIN:** The installer bakes these values into this file during setup. If you see `<shared-secret>` above (not a real token), the skill was not installed via the setup wizard. In that case, read the `sharedSecret` field from `relay/config.json` in the current working directory. Skip files where the secret contains "CHANGE-ME".
 
 ## Step-by-Step Protocol
 
