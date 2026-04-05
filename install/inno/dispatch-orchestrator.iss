@@ -167,18 +167,18 @@ Filename: "powershell.exe"; \
 [UninstallRun]
 ; Kill any node.exe processes running from the install directory (relay/worker started manually)
 Filename: "cmd.exe"; Parameters: "/C wmic process where ""CommandLine like '%{app}%' and Name='node.exe'"" call terminate >nul 2>&1"; \
-  Flags: runhidden waituntilterminated
+  Flags: runhidden waituntilterminated; RunOnceId: "KillNodeProcesses"
 ; Stop and remove the relay service if it exists
 Filename: "cmd.exe"; Parameters: "/C sc stop DispatchRelay >nul 2>&1 & sc delete DispatchRelay >nul 2>&1"; \
-  Flags: runhidden waituntilterminated
+  Flags: runhidden waituntilterminated; RunOnceId: "RemoveRelayService"
 ; Stop and remove the worker service if it exists
 Filename: "cmd.exe"; Parameters: "/C sc stop DispatchWorker >nul 2>&1 & sc delete DispatchWorker >nul 2>&1"; \
-  Flags: runhidden waituntilterminated
+  Flags: runhidden waituntilterminated; RunOnceId: "RemoveWorkerService"
 ; Also try NSSM-based services (different naming convention)
 Filename: "cmd.exe"; Parameters: "/C nssm stop DispatchRelay >nul 2>&1 & nssm remove DispatchRelay confirm >nul 2>&1"; \
-  Flags: runhidden waituntilterminated
+  Flags: runhidden waituntilterminated; RunOnceId: "RemoveNssmRelay"
 Filename: "cmd.exe"; Parameters: "/C nssm stop DispatchWorker >nul 2>&1 & nssm remove DispatchWorker confirm >nul 2>&1"; \
-  Flags: runhidden waituntilterminated
+  Flags: runhidden waituntilterminated; RunOnceId: "RemoveNssmWorker"
 
 ; --------------------------------------------------------------------------
 ; Directories to clean up on uninstall
