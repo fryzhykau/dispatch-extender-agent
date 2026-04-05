@@ -7,7 +7,7 @@
 $ErrorActionPreference = "Stop"
 
 $ScriptDir   = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$AppRoot     = Split-Path -Parent $ScriptDir
+$AppRoot     = Split-Path -Parent (Split-Path -Parent $ScriptDir)
 $WizardScript = Join-Path $AppRoot "install\setup-wizard.ps1"
 
 # Use ProgramData for logs (Program Files is read-only for non-admin)

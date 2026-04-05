@@ -5,6 +5,6 @@ logs/
 .env*
 certs/
 dist/
-installer/assets/*.bmp
-installer/assets/*.ico
-installer/version.iss
+install/inno/assets/*.bmp
+install/inno/assets/*.ico
+install/inno/version.iss

@@ -44,7 +44,9 @@ coordinator/
 └── decompose.js       # task decomposition + orchestration logic
 install/
 ├── install-relay.ps1  # register relay as Windows service (NSSM)
-└── install-worker.ps1 # register worker as Windows service (NSSM)
+├── install-worker.ps1 # register worker as Windows service (NSSM)
+├── setup-wizard.ps1   # orchestrator setup wizard (WinForms GUI)
+└── inno/              # Inno Setup installer build system
 ```
 
 ## Key Dependencies

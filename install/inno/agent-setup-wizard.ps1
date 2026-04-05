@@ -7,7 +7,7 @@
     in a Dispatch Orchestrator network. This is a simplified, self-contained
     version for agent/worker machines only — no relay, orchestrator, or dashboard.
 
-    Run with:  powershell -ExecutionPolicy Bypass -File installer\agent-setup-wizard.ps1
+    Run with:  powershell -ExecutionPolicy Bypass -File install\inno\agent-setup-wizard.ps1
 #>
 
 Set-StrictMode -Version Latest
@@ -60,7 +60,7 @@ function S([double]$val) { [int][math]::Round($val * $script:DpiScale) }
 # Resolve paths
 # ---------------------------------------------------------------------------
 $ScriptDir   = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$ProjectRoot = Split-Path -Parent $ScriptDir
+$ProjectRoot = Split-Path -Parent (Split-Path -Parent $ScriptDir)
 $ConfigFile  = Join-Path $ProjectRoot "worker\worker-config.json"
 
 # ---------------------------------------------------------------------------
@@ -139,7 +139,7 @@ $form.BackColor = $ColorDarkBg
 $form.ForeColor = $ColorWhite
 $form.Font = $FontBody
 
-$icoPath = Join-Path $ProjectRoot "installer\assets\icon.ico"
+$icoPath = Join-Path (Join-Path $ProjectRoot "install\inno") "assets\icon.ico"
 if (Test-Path $icoPath) {
     $form.Icon = New-Object System.Drawing.Icon($icoPath)
 }
@@ -333,12 +333,9 @@ New-StyledLabel -Parent $p0 -Text "Dispatch Agent Setup" -X 20 -Y 14 -Width 450 
 New-StyledLabel -Parent $p0 -Text "This wizard will configure this machine as a named agent`nin your Dispatch Orchestrator network." -X 20 -Y 54 -Width 450 -Height 44 -Font $FontSubtitle | Out-Null
 
 # Architecture diagram image
-$diagramPath = Join-Path $ProjectRoot "logo"
-$diagramPath = Join-Path $diagramPath "agent-diagram-simple.png"
+$diagramPath = Join-Path (Join-Path $ProjectRoot "docs") "images\agent-diagram-simple.png"
 if (-not (Test-Path $diagramPath)) {
-    $diagramPath = Join-Path $ProjectRoot "installer"
-    $diagramPath = Join-Path $diagramPath "assets"
-    $diagramPath = Join-Path $diagramPath "agent-diagram.png"
+    $diagramPath = Join-Path (Join-Path $ProjectRoot "install\inno") "assets\agent-diagram.png"
 }
 if (Test-Path $diagramPath) {
     # Pre-scale the diagram with high-quality bicubic to avoid PictureBox pixelation

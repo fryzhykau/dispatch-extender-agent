@@ -7,9 +7,9 @@
     and produces ready-to-distribute installer EXE(s) in the dist/ directory.
 
     Run with:  npm run build:installer
-    Or:        powershell -ExecutionPolicy Bypass -File installer\build.ps1
-    Or:        powershell -ExecutionPolicy Bypass -File installer\build.ps1 -Target agent
-    Or:        powershell -ExecutionPolicy Bypass -File installer\build.ps1 -Target all
+    Or:        powershell -ExecutionPolicy Bypass -File install\inno\build.ps1
+    Or:        powershell -ExecutionPolicy Bypass -File install\inno\build.ps1 -Target agent
+    Or:        powershell -ExecutionPolicy Bypass -File install\inno\build.ps1 -Target all
 
 .PARAMETER Target
     Which installer(s) to build:
@@ -34,7 +34,7 @@ $ErrorActionPreference = "Stop"
 # Paths
 # ---------------------------------------------------------------------------
 $ScriptDir   = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$ProjectRoot = Split-Path -Parent $ScriptDir
+$ProjectRoot = Split-Path -Parent (Split-Path -Parent $ScriptDir)
 $DistDir     = Join-Path $ProjectRoot "dist"
 
 # Determine which .iss files to compile based on the -Target parameter

@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node worker/agent-relay.js",
-    "setup": "powershell -ExecutionPolicy Bypass -File installer/agent-setup-wizard.ps1"
+    "setup": "powershell -ExecutionPolicy Bypass -File install/inno/agent-setup-wizard.ps1"
   },
   "dependencies": {
     "ws": "^8.18.0"

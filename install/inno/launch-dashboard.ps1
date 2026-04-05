@@ -3,7 +3,7 @@
     Starts the relay server and opens the dashboard in the default browser.
 #>
 
-$AppRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Definition)
+$AppRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Definition))
 
 # Use ProgramData for logs (Program Files is read-only for non-admin)
 $LogDir  = Join-Path $env:ProgramData "DispatchOrchestrator\logs"

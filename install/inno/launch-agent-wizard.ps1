@@ -7,8 +7,8 @@
 $ErrorActionPreference = "Stop"
 
 $ScriptDir   = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$AppRoot     = Split-Path -Parent $ScriptDir
-$WizardScript = Join-Path $AppRoot "installer\agent-setup-wizard.ps1"
+$AppRoot     = Split-Path -Parent (Split-Path -Parent $ScriptDir)
+$WizardScript = Join-Path (Join-Path $AppRoot "install\inno") "agent-setup-wizard.ps1"
 
 # Use ProgramData for logs (Program Files is read-only for non-admin)
 $LogDir  = Join-Path $env:ProgramData "DispatchAgent\logs"

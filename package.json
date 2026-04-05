@@ -19,10 +19,10 @@
     "pii-check": "node scripts/pii-check.js",
     "precommit": "npm run pii-check && npm test",
     "setup": "powershell -ExecutionPolicy Bypass -File install/setup-wizard.ps1",
-    "build:installer": "powershell -ExecutionPolicy Bypass -File installer/build.ps1",
-    "build:agent-installer": "powershell -ExecutionPolicy Bypass -File installer/build.ps1 -Target agent",
-    "build:all-installers": "powershell -ExecutionPolicy Bypass -File installer/build.ps1 -Target all",
-    "build:assets": "powershell -ExecutionPolicy Bypass -File installer/create-assets.ps1",
+    "build:installer": "powershell -ExecutionPolicy Bypass -File install/inno/build.ps1",
+    "build:agent-installer": "powershell -ExecutionPolicy Bypass -File install/inno/build.ps1 -Target agent",
+    "build:all-installers": "powershell -ExecutionPolicy Bypass -File install/inno/build.ps1 -Target all",
+    "build:assets": "powershell -ExecutionPolicy Bypass -File install/inno/create-assets.ps1",
     "version:sync": "node scripts/sync-version.js"
   },
   "dependencies": {

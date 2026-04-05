@@ -1,22 +1,22 @@
 ; ==========================================================================
-; Dispatch Orchestrator - Inno Setup Installer Script
+; Dispatch Agent - Inno Setup Installer Script
 ; ==========================================================================
-; Builds a professional Windows installer for the multi-machine
-; Claude Dispatch Orchestrator project.
+; Builds a lightweight Windows installer for the worker agent only.
+; This is distributed to remote machines that only need the agent component.
 ;
 ; Requires: Inno Setup 6+ (https://jrsoftware.org/isinfo.php)
-; Build:    Run installer/build.ps1 or invoke ISCC.exe directly.
+; Build:    Run install/inno/build.ps1 -Target agent
 ; ==========================================================================
 
 #include "version.iss"
-#define MyAppName      "Dispatch Orchestrator"
+#define MyAppName      "Dispatch Agent"
 #define MyAppPublisher "Dispatch Orchestrator"
 #define MyAppURL       "https://github.com/fryzhykau/dispatch-extender-agent"
 #define MyAppExeName   "node.exe"
 
 [Setup]
-; Application identity
-AppId={{B5E2F8A1-3D4C-4E6F-9A1B-7C8D2E3F4A5B}
+; Application identity (different GUID from the full orchestrator)
+AppId={{A3D1E7B2-5F6C-4A8E-B9C0-1D2E3F4A5B6C}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
@@ -26,14 +26,14 @@ AppSupportURL={#MyAppURL}/issues
 AppUpdatesURL={#MyAppURL}/releases
 
 ; Installation directories
-DefaultDirName={autopf}\DispatchOrchestrator
+DefaultDirName={autopf}\DispatchAgent
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 
 ; Output settings
-OutputDir=..\dist
-OutputBaseFilename=DispatchOrchestratorSetup
-SetupIconFile=assets\icon.ico
+OutputDir=..\..\dist
+OutputBaseFilename=DispatchAgentSetup
+SetupIconFile=assets\agent-icon.ico
 
 ; Compression (LZMA2 ultra for smallest output)
 Compression=lzma2/ultra64
@@ -42,8 +42,8 @@ LZMANumBlockThreads=4
 
 ; Modern wizard style
 WizardStyle=modern
-WizardImageFile=assets\wizard-banner.bmp
-WizardSmallImageFile=assets\wizard-small.bmp
+WizardImageFile=assets\agent-wizard-banner.bmp
+WizardSmallImageFile=assets\agent-wizard-small.bmp
 
 ; Privileges and platform
 PrivilegesRequired=admin
@@ -52,90 +52,85 @@ ArchitecturesInstallIn64BitMode=x64compatible
 
 ; Uninstall settings
 UninstallDisplayName={#MyAppName}
-UninstallDisplayIcon={app}\installer\assets\icon.ico
+UninstallDisplayIcon={app}\install\inno\assets\icon.ico
 
 ; Misc
 AllowNoIcons=yes
 ChangesEnvironment=no
 
 ; --------------------------------------------------------------------------
-; Files to install
+; Files to install (agent-only — lightweight)
 ; --------------------------------------------------------------------------
 [Files]
-; Core application directories
-Source: "..\relay\*";         DestDir: "{app}\relay";       Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\worker\*";        DestDir: "{app}\worker";      Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\coordinator\*";   DestDir: "{app}\coordinator"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\dashboard\*";     DestDir: "{app}\dashboard";   Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\lib\*";           DestDir: "{app}\lib";         Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\install\*";       DestDir: "{app}\install";     Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\scripts\*";       DestDir: "{app}\scripts";     Flags: ignoreversion recursesubdirs createallsubdirs
+; Worker agent
+Source: "..\..\worker\agent-relay.js";      DestDir: "{app}\worker";    Flags: ignoreversion
+Source: "..\..\worker\discovery.js";        DestDir: "{app}\worker";    Flags: ignoreversion
+Source: "..\..\worker\worker-config.json";  DestDir: "{app}\worker";    Flags: ignoreversion onlyifdoesntexist
 
-; Package manifests (needed for npm install)
-Source: "..\package.json";      DestDir: "{app}"; Flags: ignoreversion
-Source: "..\package-lock.json"; DestDir: "{app}"; Flags: ignoreversion
+; Shared library
+Source: "..\..\lib\keep-awake.js";          DestDir: "{app}\lib";       Flags: ignoreversion
 
-; Documentation
-Source: "..\CLAUDE.md";  DestDir: "{app}"; Flags: ignoreversion
-Source: "..\README.md";  DestDir: "{app}"; Flags: ignoreversion
+; Install / setup scripts
+Source: "..\install-worker.ps1"; DestDir: "{app}\install";   Flags: ignoreversion
+Source: "..\generate-certs.ps1"; DestDir: "{app}\install";   Flags: ignoreversion
+
+; Agent setup wizard
+Source: "agent-setup-wizard.ps1";        DestDir: "{app}\install\inno"; Flags: ignoreversion
+Source: "launch-agent-wizard.ps1";       DestDir: "{app}\install\inno"; Flags: ignoreversion
+
+; Minimal package.json for npm install (only ws dependency)
+Source: "agent-package.json";            DestDir: "{app}"; DestName: "package.json"; Flags: ignoreversion
 
 ; Icon for uninstall display and shortcuts
-Source: "assets\icon.ico"; DestDir: "{app}\installer\assets"; Flags: ignoreversion
+Source: "assets\agent-icon.ico";         DestDir: "{app}\install\inno\assets"; DestName: "icon.ico"; Flags: ignoreversion
 
-; Launcher scripts (with logging)
-Source: "launch-wizard.ps1"; DestDir: "{app}\installer"; Flags: ignoreversion
-Source: "launch-dashboard.ps1"; DestDir: "{app}\installer"; Flags: ignoreversion
-
-; Images for setup wizard
-Source: "..\logo\integration-diagram-simple.png"; DestDir: "{app}\installer\assets"; DestName: "integration-diagram.png"; Flags: ignoreversion
+; Diagram for agent setup wizard welcome page
+Source: "..\..\docs\images\agent-diagram-simple.png"; DestDir: "{app}\install\inno\assets"; DestName: "agent-diagram.png"; Flags: ignoreversion
 
 ; --------------------------------------------------------------------------
 ; Registry entries
 ; --------------------------------------------------------------------------
 [Registry]
-; Store the install path for other tools / scripts to find
-Root: HKLM; Subkey: "SOFTWARE\DispatchOrchestrator"; ValueType: string; ValueName: "InstallPath"; ValueData: "{app}"; Flags: uninsdeletekey
-Root: HKLM; Subkey: "SOFTWARE\DispatchOrchestrator"; ValueType: string; ValueName: "Version";     ValueData: "{#MyAppVersion}"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "SOFTWARE\DispatchAgent"; ValueType: string; ValueName: "InstallPath"; ValueData: "{app}"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "SOFTWARE\DispatchAgent"; ValueType: string; ValueName: "Version";     ValueData: "{#MyAppVersion}"; Flags: uninsdeletekey
 
 ; --------------------------------------------------------------------------
-; Start Menu and Desktop shortcuts
+; Start Menu shortcuts
 ; --------------------------------------------------------------------------
 [Icons]
-; Setup wizard
-Name: "{group}\Dispatch Orchestrator Setup"; Filename: "powershell.exe"; \
-  Parameters: "-ExecutionPolicy Bypass -File ""{app}\install\setup-wizard.ps1"""; \
-  WorkingDir: "{app}"; Comment: "Run the setup wizard to configure relay or worker"
+; Agent Setup Wizard
+Name: "{group}\Agent Setup"; Filename: "powershell.exe"; \
+  Parameters: "-ExecutionPolicy Bypass -File ""{app}\install\inno\agent-setup-wizard.ps1"""; \
+  WorkingDir: "{app}"; Comment: "Run the agent setup wizard to configure this worker"
 
-; Dashboard (opens in default browser)
-Name: "{group}\Dispatch Dashboard"; Filename: "http://localhost:7070/dashboard"; \
-  Comment: "Open the live monitoring dashboard in your browser"
+; Start Agent (console)
+Name: "{group}\Start Agent"; Filename: "cmd.exe"; \
+  Parameters: "/K node worker/agent-relay.js"; \
+  WorkingDir: "{app}"; Comment: "Start the worker agent connected to the coordinator"; \
+  IconFilename: "{app}\install\inno\assets\icon.ico"
 
-; Start Relay
-Name: "{group}\Start Relay"; Filename: "cmd.exe"; \
-  Parameters: "/K node relay/server.js"; \
-  WorkingDir: "{app}"; Comment: "Start the WebSocket relay server"; \
-  IconFilename: "{app}\installer\assets\icon.ico"
+; Stop Agent
+Name: "{group}\Stop Agent"; Filename: "cmd.exe"; \
+  Parameters: "/C echo Stopping Dispatch Agent... & taskkill /F /FI ""WINDOWTITLE eq worker/agent-relay.js*"" >nul 2>&1 & sc stop DispatchWorker >nul 2>&1 & nssm stop DispatchWorker >nul 2>&1 & echo Done. & pause"; \
+  WorkingDir: "{app}"; Comment: "Stop the running worker agent or service"; \
+  IconFilename: "{app}\install\inno\assets\icon.ico"
 
 ; Desktop shortcuts (user can deselect via Tasks)
-Name: "{autodesktop}\Dispatch Dashboard"; Filename: "http://localhost:7070/dashboard"; \
-  Comment: "Open the Dispatch Orchestrator dashboard"; Tasks: desktopicon; \
-  IconFilename: "{app}\installer\assets\icon.ico"
+Name: "{autodesktop}\Start Agent"; Filename: "cmd.exe"; \
+  Parameters: "/K node worker/agent-relay.js"; WorkingDir: "{app}"; \
+  Comment: "Start the worker agent"; Tasks: desktopicon; \
+  IconFilename: "{app}\install\inno\assets\icon.ico"
 
-Name: "{autodesktop}\Start Relay"; Filename: "cmd.exe"; \
-  Parameters: "/K node relay/server.js"; WorkingDir: "{app}"; \
-  Comment: "Start the WebSocket relay server"; Tasks: desktopicon; \
-  IconFilename: "{app}\installer\assets\icon.ico"
-
-Name: "{autodesktop}\Dispatch Setup"; Filename: "powershell.exe"; \
-  Parameters: "-ExecutionPolicy Bypass -File ""{app}\install\setup-wizard.ps1"""; WorkingDir: "{app}"; \
-  Comment: "Run the setup wizard"; Tasks: desktopicon; \
-  IconFilename: "{app}\installer\assets\icon.ico"
+Name: "{autodesktop}\Agent Setup"; Filename: "powershell.exe"; \
+  Parameters: "-ExecutionPolicy Bypass -File ""{app}\install\inno\agent-setup-wizard.ps1"""; WorkingDir: "{app}"; \
+  Comment: "Run the agent setup wizard"; Tasks: desktopicon; \
+  IconFilename: "{app}\install\inno\assets\icon.ico"
 
 ; --------------------------------------------------------------------------
 ; Optional tasks presented to the user
 ; --------------------------------------------------------------------------
 [Tasks]
-Name: "desktopicon"; Description: "Create &desktop shortcuts (Dashboard, Start Relay, Setup)"; GroupDescription: "Additional shortcuts:"
+Name: "desktopicon"; Description: "Create &desktop shortcuts (Start Agent, Agent Setup)"; GroupDescription: "Additional shortcuts:"
 ; --------------------------------------------------------------------------
 ; Post-install actions
 ; --------------------------------------------------------------------------
@@ -145,32 +140,20 @@ Filename: "cmd.exe"; Parameters: "/C echo Installing dependencies... && npm inst
   WorkingDir: "{app}"; StatusMsg: "Installing Node.js dependencies..."; \
   Flags: runhidden waituntilterminated; Check: NodeJsInstalled
 
-; Kill any existing relay process before launching the wizard (avoids EADDRINUSE)
-Filename: "cmd.exe"; \
-  Parameters: "/C for /f ""tokens=5"" %a in ('netstat -ano ^| findstr :7070 ^| findstr LISTENING') do taskkill /PID %a /F >nul 2>&1"; \
-  Flags: runhidden waituntilterminated
-
-; Launch the setup wizard after installation completes
+; Launch the agent setup wizard after installation completes
 Filename: "powershell.exe"; \
-  Parameters: "-ExecutionPolicy Bypass -File ""{app}\installer\launch-wizard.ps1"""; \
-  WorkingDir: "{app}"; Description: "Launch the Setup Wizard now"; \
+  Parameters: "-ExecutionPolicy Bypass -File ""{app}\install\inno\launch-agent-wizard.ps1"""; \
+  WorkingDir: "{app}"; Description: "Launch the Agent Setup Wizard now"; \
   Flags: postinstall skipifsilent waituntilterminated
-
-; Dashboard launch is handled by the setup wizard's Complete page button
 
 ; --------------------------------------------------------------------------
 ; Uninstall actions — clean up Windows services
 ; --------------------------------------------------------------------------
 [UninstallRun]
-; Stop and remove the relay service if it exists
-Filename: "cmd.exe"; Parameters: "/C sc stop DispatchRelay >nul 2>&1 & sc delete DispatchRelay >nul 2>&1"; \
-  Flags: runhidden waituntilterminated
-; Stop and remove the worker service if it exists
+; Stop and remove the worker service (sc-based)
 Filename: "cmd.exe"; Parameters: "/C sc stop DispatchWorker >nul 2>&1 & sc delete DispatchWorker >nul 2>&1"; \
   Flags: runhidden waituntilterminated
-; Also try NSSM-based services (different naming convention)
-Filename: "cmd.exe"; Parameters: "/C nssm stop DispatchRelay >nul 2>&1 & nssm remove DispatchRelay confirm >nul 2>&1"; \
-  Flags: runhidden waituntilterminated
+; Stop and remove the worker service (NSSM-based)
 Filename: "cmd.exe"; Parameters: "/C nssm stop DispatchWorker >nul 2>&1 & nssm remove DispatchWorker confirm >nul 2>&1"; \
   Flags: runhidden waituntilterminated
 
@@ -179,7 +162,6 @@ Filename: "cmd.exe"; Parameters: "/C nssm stop DispatchWorker >nul 2>&1 & nssm r
 ; --------------------------------------------------------------------------
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\node_modules"
-Type: filesandordirs; Name: "{app}\data"
 Type: filesandordirs; Name: "{app}\logs"
 Type: filesandordirs; Name: "{app}\certs"
 
@@ -215,13 +197,31 @@ begin
   end;
 end;
 
-// Check if NSSM is available on PATH
-function NssmInstalled: Boolean;
+// Check if Claude Code CLI is available on PATH
+function ClaudeCliInstalled: Boolean;
 var
   ResultCode: Integer;
 begin
-  Result := Exec('cmd.exe', '/C nssm version', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+  Result := Exec('cmd.exe', '/C claude --version', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
             and (ResultCode = 0);
+end;
+
+// Retrieve the installed Claude CLI version string
+function GetClaudeVersion: String;
+var
+  TmpFile: String;
+  Lines: TArrayOfString;
+  ResultCode: Integer;
+begin
+  Result := '(not found)';
+  TmpFile := ExpandConstant('{tmp}\claudeversion.txt');
+  if Exec('cmd.exe', '/C claude --version > "' + TmpFile + '" 2>&1', '',
+           SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    if LoadStringsFromFile(TmpFile, Lines) and (GetArrayLength(Lines) > 0) then
+      Result := Trim(Lines[0]);
+    DeleteFile(TmpFile);
+  end;
 end;
 
 // Extract the major version number from a Node version string like "v20.11.0"
@@ -232,13 +232,21 @@ var
 begin
   Result := 0;
   S := Ver;
-  // Strip leading 'v'
   if (Length(S) > 0) and ((S[1] = 'v') or (S[1] = 'V')) then
     S := Copy(S, 2, Length(S) - 1);
   DotPos := Pos('.', S);
   if DotPos > 0 then
     S := Copy(S, 1, DotPos - 1);
   Result := StrToIntDef(S, 0);
+end;
+
+// Check if NSSM is available on PATH
+function NssmInstalled: Boolean;
+var
+  ResultCode: Integer;
+begin
+  Result := Exec('cmd.exe', '/C nssm version', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+            and (ResultCode = 0);
 end;
 
 var
@@ -270,6 +278,7 @@ procedure UpdatePrereqPage;
 var
   NodeVer: String;
   NodeMajor: Integer;
+  ClaudeVer: String;
   Info: String;
 begin
   Info := '';
@@ -288,8 +297,23 @@ begin
   else
   begin
     Info := Info + '[!!]  Node.js is NOT installed.' + #13#10;
-    Info := Info + '      Node.js 18+ is required for Dispatch Orchestrator.' + #13#10;
+    Info := Info + '      Node.js 18+ is required for the Dispatch Agent.' + #13#10;
     Info := Info + '      Download from: https://nodejs.org/' + #13#10;
+  end;
+
+  Info := Info + #13#10;
+
+  // --- Claude Code CLI ---
+  if ClaudeCliInstalled then
+  begin
+    ClaudeVer := GetClaudeVersion;
+    Info := Info + '[OK]  Claude Code CLI is installed: ' + ClaudeVer + #13#10;
+  end
+  else
+  begin
+    Info := Info + '[!!]  Claude Code CLI is NOT installed.' + #13#10;
+    Info := Info + '      The agent requires Claude Code to execute tasks.' + #13#10;
+    Info := Info + '      Install: npm install -g @anthropic-ai/claude-code' + #13#10;
   end;
 
   Info := Info + #13#10;
@@ -300,19 +324,19 @@ begin
   else
   begin
     Info := Info + '[--]  NSSM is not installed (optional).' + #13#10;
-    Info := Info + '      NSSM is needed only if you want to run relay/worker' + #13#10;
-    Info := Info + '      as Windows services. Download: https://nssm.cc/' + #13#10;
+    Info := Info + '      NSSM is needed only if you want to run the agent' + #13#10;
+    Info := Info + '      as a Windows service. Download: https://nssm.cc/' + #13#10;
   end;
 
   Info := Info + #13#10;
   Info := Info + '---------------------------------------------' + #13#10;
-  Info := Info + 'You may continue the installation even if Node.js is missing,' + #13#10;
-  Info := Info + 'but you will need to install it before running the application.' + #13#10;
+  Info := Info + 'You may continue even if prerequisites are missing,' + #13#10;
+  Info := Info + 'but you will need to install them before running the agent.' + #13#10;
 
   PrereqMemo.Text := Info;
 end;
 
-// Called when the wizard initialises — create our custom pages
+// Called when the wizard initialises
 procedure InitializeWizard;
 begin
   CreatePrereqPage;
@@ -332,21 +356,33 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
-    // If Node.js is missing, warn the user and offer to open download page
     if not NodeJsInstalled then
     begin
       if MsgBox('Node.js was not found on this system.' + #13#10 + #13#10 +
-                'Dispatch Orchestrator requires Node.js 18 or newer.' + #13#10 +
+                'The Dispatch Agent requires Node.js 18 or newer.' + #13#10 +
                 'Would you like to open the Node.js download page now?',
                 mbConfirmation, MB_YESNO) = IDYES then
       begin
         ShellExec('open', 'https://nodejs.org/en/download/', '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
       end;
     end;
+
+    if not ClaudeCliInstalled then
+    begin
+      if MsgBox('Claude Code CLI was not found on this system.' + #13#10 + #13#10 +
+                'The agent needs Claude Code to execute tasks.' + #13#10 +
+                'Install it later with: npm install -g @anthropic-ai/claude-code' + #13#10 + #13#10 +
+                'Would you like to install it now? (requires npm)',
+                mbConfirmation, MB_YESNO) = IDYES then
+      begin
+        Exec('cmd.exe', '/C npm install -g @anthropic-ai/claude-code', '',
+             SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode);
+      end;
+    end;
   end;
 end;
 
-// Confirm uninstall — remind user about services
+// Confirm uninstall
 function InitializeUninstall: Boolean;
 begin
   Result := MsgBox('This will uninstall {#MyAppName} and remove any associated Windows services.' + #13#10 + #13#10 +

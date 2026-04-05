@@ -258,8 +258,8 @@ $form.BackColor = $C_BG
 $form.ForeColor = $C_TEXT
 $form.Font = $F_NORMAL
 
-# Set form icon from installer assets
-$icoPath = Join-Path $ProjectRoot "installer\assets\icon.ico"
+# Set form icon from install/inno assets
+$icoPath = Join-Path (Join-Path $ProjectRoot "install\inno") "assets\icon.ico"
 if (Test-Path $icoPath) {
     $form.Icon = New-Object System.Drawing.Icon($icoPath)
 }
@@ -345,9 +345,9 @@ $p0.Controls.Add((New-StyledLabel -Text "This orchestrator extends Anthropic's D
     -X 20 -Y 54 -Width 470 -Height 60 -Font $F_NORMAL -Color $C_TEXTDIM))
 
 # Architecture diagram image
-$diagramPath = Join-Path $ProjectRoot "logo\integration-diagram-simple.png"
+$diagramPath = Join-Path (Join-Path $ProjectRoot "docs") "images\integration-diagram-simple.png"
 if (-not (Test-Path $diagramPath)) {
-    $diagramPath = Join-Path $ProjectRoot "installer\assets\integration-diagram.png"
+    $diagramPath = Join-Path (Join-Path $ProjectRoot "install\inno") "assets\integration-diagram.png"
 }
 if (Test-Path $diagramPath) {
     # Pre-scale the diagram with high-quality bicubic to avoid PictureBox pixelation

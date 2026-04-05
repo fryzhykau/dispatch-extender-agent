@@ -4,11 +4,11 @@
 
 Extends Anthropic's [Dispatch](https://docs.anthropic.com/en/docs/claude-code/dispatch) (phone to one desktop) into a hub-and-spoke model: your phone dispatches tasks through an orchestrator machine, which routes subtasks to one or more named worker agents over a local WebSocket relay.
 
-![Architecture Diagram](logo/integration-diagram-simple.png)
+![Architecture Diagram](docs/images/integration-diagram-simple.png)
 
 Each agent machine runs a lightweight worker that connects to the orchestrator's relay:
 
-![Agent Connection](logo/agent-diagram-simple.png)
+![Agent Connection](docs/images/agent-diagram-simple.png)
 
 ## What This Enables (Beyond Standard Dispatch)
 
@@ -157,7 +157,16 @@ lib/
 install/
 ├── install-relay.ps1  # Register relay as Windows service (NSSM)
 ├── install-worker.ps1 # Register worker as Windows service (NSSM)
-└── generate-certs.ps1 # Generate TLS certificates (OpenSSL)
+├── generate-certs.ps1 # Generate TLS certificates (OpenSSL)
+├── setup-wizard.ps1   # Orchestrator setup wizard (WinForms GUI)
+└── inno/              # Inno Setup installer build system
+    ├── build.ps1              # Build .exe installers
+    ├── dispatch-orchestrator.iss  # Orchestrator installer script
+    ├── dispatch-agent.iss         # Agent installer script
+    └── assets/                    # Wizard banners, icons
+
+docs/
+└── images/            # Architecture diagrams for README and wizards
 ```
 
 ### Communication Flow

@@ -57,11 +57,11 @@ worker/         Worker agent process
 coordinator/    Task decomposition + load balancing
 dashboard/      Single-page monitoring UI
 lib/            Shared utilities (keep-awake, data-dir)
-install/        Service installers + setup wizard
-installer/      Inno Setup installer scripts + assets
+install/        Service installers, setup wizard, and Inno Setup build (inno/)
 test/           Test suites
 scripts/        Build and maintenance scripts
-logo/           Logo and diagram assets
+logo/           Logo images (branding)
+docs/images/    Architecture diagrams
 ```
 
 ## License

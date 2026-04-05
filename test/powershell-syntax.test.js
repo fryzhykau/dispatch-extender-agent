@@ -35,7 +35,7 @@ function readPs1(filePath) {
   return readFileSync(filePath, 'utf-8');
 }
 
-const ps1Files = findPs1Files('install', 'installer', 'scripts');
+const ps1Files = findPs1Files('install', 'install/inno', 'scripts');
 
 // ============================================================
 // 1. Syntax validation — PowerShell parser
@@ -262,13 +262,13 @@ describe('JavaScript security checks', () => {
   });
 
   it('agent wizard Test Connection should require shared secret', () => {
-    const content = readFileSync(join(projectRoot, 'installer', 'agent-setup-wizard.ps1'), 'utf-8');
+    const content = readFileSync(join(projectRoot, 'install', 'inno', 'agent-setup-wizard.ps1'), 'utf-8');
     assert.ok(content.includes('enter the shared secret first') || content.includes('Please enter the shared secret'),
       'Test Connection should check for empty secret before testing');
   });
 
   it('agent wizard Test Connection should verify HMAC on UDP discovery', () => {
-    const content = readFileSync(join(projectRoot, 'installer', 'agent-setup-wizard.ps1'), 'utf-8');
+    const content = readFileSync(join(projectRoot, 'install', 'inno', 'agent-setup-wizard.ps1'), 'utf-8');
     assert.ok(content.includes('HMACSHA256'),
       'Auto-discovery test should verify HMAC signature');
     assert.ok(content.includes('HMAC mismatch'),
@@ -276,7 +276,7 @@ describe('JavaScript security checks', () => {
   });
 
   it('agent wizard should write config without UTF-8 BOM', () => {
-    const content = readFileSync(join(projectRoot, 'installer', 'agent-setup-wizard.ps1'), 'utf-8');
+    const content = readFileSync(join(projectRoot, 'install', 'inno', 'agent-setup-wizard.ps1'), 'utf-8');
     assert.ok(content.includes('UTF8Encoding $false'),
       'Config should be written with UTF8Encoding($false) to avoid BOM');
   });
@@ -408,7 +408,7 @@ describe('JavaScript security checks', () => {
   });
 
   it('agent wizard should have elevated config write fallback', () => {
-    const content = readFileSync(join(projectRoot, 'installer', 'agent-setup-wizard.ps1'), 'utf-8');
+    const content = readFileSync(join(projectRoot, 'install', 'inno', 'agent-setup-wizard.ps1'), 'utf-8');
     assert.ok(content.includes('Verb RunAs'),
       'Agent wizard should fall back to elevated write for Program Files');
   });

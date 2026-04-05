@@ -37,7 +37,8 @@ dispatch-orchestrator/
 │   └── decompose.js       # Claude Code skill: task → subtask list
 ├── install/
 │   ├── install-relay.ps1  # register relay as Windows service (NSSM)
-│   └── install-worker.ps1 # register worker as Windows service (NSSM)
+│   ├── install-worker.ps1 # register worker as Windows service (NSSM)
+│   └── inno/              # Inno Setup installer build system
 └── CLAUDE.md              # coordinator skill loaded by Dispatch
 ```
 

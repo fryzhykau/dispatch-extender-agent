@@ -25,7 +25,7 @@ $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Drawing
 
 $ScriptDir  = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$ProjectRoot = Split-Path -Parent $ScriptDir
+$ProjectRoot = Split-Path -Parent (Split-Path -Parent $ScriptDir)
 $AssetsDir  = Join-Path $ScriptDir "assets"
 $LogoDir      = Join-Path $ProjectRoot "logo"
 $OrcLogoFile  = Join-Path $LogoDir "claude-code-dispatch-orchestrator-logo.png"
