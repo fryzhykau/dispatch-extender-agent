@@ -162,9 +162,12 @@ Filename: "powershell.exe"; \
 ; Dashboard launch is handled by the setup wizard's Complete page button
 
 ; --------------------------------------------------------------------------
-; Uninstall actions — clean up Windows services
+; Uninstall actions — stop processes and clean up Windows services
 ; --------------------------------------------------------------------------
 [UninstallRun]
+; Kill any node.exe processes running from the install directory (relay/worker started manually)
+Filename: "cmd.exe"; Parameters: "/C wmic process where ""CommandLine like '%{app}%' and Name='node.exe'"" call terminate >nul 2>&1"; \
+  Flags: runhidden waituntilterminated
 ; Stop and remove the relay service if it exists
 Filename: "cmd.exe"; Parameters: "/C sc stop DispatchRelay >nul 2>&1 & sc delete DispatchRelay >nul 2>&1"; \
   Flags: runhidden waituntilterminated

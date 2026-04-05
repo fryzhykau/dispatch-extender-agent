@@ -76,6 +76,7 @@ Write-Host "Installing service '$ServiceName'..."
 if ($LASTEXITCODE -ne 0) { Write-Error "NSSM install failed."; exit 1 }
 
 & $nssm set $ServiceName AppDirectory $AppDirectory
+& $nssm set $ServiceName ObjectName "NT AUTHORITY\NetworkService" "" 2>&1 | Out-Null
 & $nssm set $ServiceName Start SERVICE_AUTO_START
 & $nssm set $ServiceName AppStdout (Join-Path $LogsDir "$ServiceName-stdout.log")
 & $nssm set $ServiceName AppStderr (Join-Path $LogsDir "$ServiceName-stderr.log")

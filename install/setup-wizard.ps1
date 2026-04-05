@@ -1611,6 +1611,7 @@ function Run-Installation {
 
                 & $nssmPath install $svcName $nodePath $entryScript 2>&1 | Out-Null
                 & $nssmPath set $svcName AppDirectory $appDir 2>&1 | Out-Null
+                & $nssmPath set $svcName ObjectName "NT AUTHORITY\NetworkService" "" 2>&1 | Out-Null
                 if ($script:cbAutoStart.Checked) {
                     & $nssmPath set $svcName Start SERVICE_AUTO_START 2>&1 | Out-Null
                 }

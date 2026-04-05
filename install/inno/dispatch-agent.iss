@@ -147,9 +147,12 @@ Filename: "powershell.exe"; \
   Flags: postinstall skipifsilent waituntilterminated
 
 ; --------------------------------------------------------------------------
-; Uninstall actions — clean up Windows services
+; Uninstall actions — stop processes and clean up Windows services
 ; --------------------------------------------------------------------------
 [UninstallRun]
+; Kill any node.exe processes running from the install directory (agent started manually)
+Filename: "cmd.exe"; Parameters: "/C wmic process where ""CommandLine like '%{app}%' and Name='node.exe'"" call terminate >nul 2>&1"; \
+  Flags: runhidden waituntilterminated
 ; Stop and remove the worker service (sc-based)
 Filename: "cmd.exe"; Parameters: "/C sc stop DispatchWorker >nul 2>&1 & sc delete DispatchWorker >nul 2>&1"; \
   Flags: runhidden waituntilterminated
