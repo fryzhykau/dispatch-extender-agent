@@ -90,7 +90,7 @@ Source: "launch-dashboard.ps1"; DestDir: "{app}\install\inno"; Flags: ignorevers
 Source: "..\..\docs\images\integration-diagram-simple.png"; DestDir: "{app}\install\inno\assets"; DestName: "integration-diagram.png"; Flags: ignoreversion
 
 ; Claude Code orchestrate skill
-Source: "..\..\.claude\commands\orchestrate.md"; DestDir: "{app}\.claude\commands"; Flags: ignoreversion
+Source: "..\..\.claude\skills\orchestrate\SKILL.md"; DestDir: "{app}\.claude\skills\orchestrate"; Flags: ignoreversion
 
 ; --------------------------------------------------------------------------
 ; Registry entries

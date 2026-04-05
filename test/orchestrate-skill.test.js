@@ -1,9 +1,9 @@
 /**
  * test/orchestrate-skill.test.js
  *
- * Tests for the .claude/commands/orchestrate.md skill file.
+ * Tests for the .claude/skills/orchestrate/SKILL.md skill file.
  * Validates the file exists, contains required protocol sections,
- * and references the correct API endpoints.
+ * references the correct API endpoints, and has valid frontmatter.
  */
 
 import { describe, it } from 'node:test';
@@ -14,9 +14,9 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
-const SKILL_PATH = path.join(ROOT, '.claude', 'commands', 'orchestrate.md');
+const SKILL_PATH = path.join(ROOT, '.claude', 'skills', 'orchestrate', 'SKILL.md');
 
-describe('orchestrate skill (.claude/commands/orchestrate.md)', () => {
+describe('orchestrate skill (.claude/skills/orchestrate/SKILL.md)', () => {
   let content;
 
   it('should exist', () => {
@@ -26,6 +26,16 @@ describe('orchestrate skill (.claude/commands/orchestrate.md)', () => {
   it('should be non-empty', () => {
     content = fs.readFileSync(SKILL_PATH, 'utf-8');
     assert.ok(content.length > 100, 'Skill file is too short');
+  });
+
+  it('should have valid YAML frontmatter with name and description', () => {
+    content = content || fs.readFileSync(SKILL_PATH, 'utf-8');
+    assert.ok(content.startsWith('---'), 'Missing frontmatter opening ---');
+    const endIdx = content.indexOf('---', 3);
+    assert.ok(endIdx > 3, 'Missing frontmatter closing ---');
+    const frontmatter = content.substring(3, endIdx);
+    assert.ok(frontmatter.includes('name: orchestrate'), 'Missing name field');
+    assert.ok(frontmatter.includes('description:'), 'Missing description field');
   });
 
   it('should document all 6 protocol steps', () => {
