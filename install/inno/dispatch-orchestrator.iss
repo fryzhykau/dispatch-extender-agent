@@ -89,6 +89,9 @@ Source: "launch-dashboard.ps1"; DestDir: "{app}\install\inno"; Flags: ignorevers
 ; Images for setup wizard
 Source: "..\..\docs\images\integration-diagram-simple.png"; DestDir: "{app}\install\inno\assets"; DestName: "integration-diagram.png"; Flags: ignoreversion
 
+; Claude Code orchestrate skill
+Source: "..\..\.claude\commands\orchestrate.md"; DestDir: "{app}\.claude\commands"; Flags: ignoreversion
+
 ; --------------------------------------------------------------------------
 ; Registry entries
 ; --------------------------------------------------------------------------
@@ -182,6 +185,7 @@ Type: filesandordirs; Name: "{app}\node_modules"
 Type: filesandordirs; Name: "{app}\data"
 Type: filesandordirs; Name: "{app}\logs"
 Type: filesandordirs; Name: "{app}\certs"
+Type: filesandordirs; Name: "{app}\.claude"
 
 ; --------------------------------------------------------------------------
 ; Pascal Script — custom logic
