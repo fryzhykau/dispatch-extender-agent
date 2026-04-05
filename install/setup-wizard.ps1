@@ -1804,21 +1804,21 @@ $btnNext.Add_Click({
                 $svcInstalled = ($script:SetupMode -eq "advanced") -and $script:cbInstallService.Checked
                 $script:lblCompleteSummary.Text = "Your machine has been configured as the Orchestrator.`nThe relay server is configured on port $port.`nShared secret has been set in relay/config.json."
                 if ($svcInstalled) {
-                    $script:txtWhatsNext.Text = "What's next:`n`n" +
-                        "  - The relay is running as a Windows service (starts on boot)`n" +
-                        "  - Open the dashboard at $proto`://localhost:$port/dashboard`n" +
-                        "  - Install agents on other machines and point them to this orchestrator`n`n" +
-                        "DASHBOARD SETUP:`n" +
-                        "  When prompted, enter your shared secret as the Bearer token.`n" +
+                    $script:txtWhatsNext.Text = "What's next:`r`n`r`n" +
+                        "  - The relay is running as a Windows service (starts on boot)`r`n" +
+                        "  - Open the dashboard at $proto`://localhost:$port/dashboard`r`n" +
+                        "  - Install agents on other machines and point them to this orchestrator`r`n`r`n" +
+                        "DASHBOARD SETUP:`r`n" +
+                        "  When prompted, enter your shared secret as the Bearer token.`r`n" +
                         "  Your shared secret is: $secretHint"
                 } else {
-                    $script:txtWhatsNext.Text = "What's next:`n`n" +
-                        "  - The relay has been started in the background`n" +
-                        "  - Open the dashboard at $proto`://localhost:$port/dashboard`n" +
-                        "  - Install agents on other machines and point them to this orchestrator`n" +
-                        "  - To restart later: npm run relay`n`n" +
-                        "DASHBOARD SETUP:`n" +
-                        "  When prompted, enter your shared secret as the Bearer token.`n" +
+                    $script:txtWhatsNext.Text = "What's next:`r`n`r`n" +
+                        "  - The relay has been started in the background`r`n" +
+                        "  - Open the dashboard at $proto`://localhost:$port/dashboard`r`n" +
+                        "  - Install agents on other machines and point them to this orchestrator`r`n" +
+                        "  - To restart later: npm run relay`r`n`r`n" +
+                        "DASHBOARD SETUP:`r`n" +
+                        "  When prompted, enter your shared secret as the Bearer token.`r`n" +
                         "  Your shared secret is: $secretHint"
                 }
             } else {
@@ -1829,23 +1829,23 @@ $btnNext.Add_Click({
                 $svcInstalled = ($script:SetupMode -eq "advanced") -and $script:cbInstallService.Checked
                 $script:lblCompleteSummary.Text = "Your machine has been configured as Worker '$agentName'.`nCoordinator: $coordHost`nConfiguration saved to worker/worker-config.json."
                 if ($svcInstalled) {
-                    $script:txtWhatsNext.Text = "What's next:`n`n" +
-                        "  - The worker is running as a Windows service (starts on boot)`n" +
-                        "  - Ensure the coordinator is running`n" +
-                        "  - Your agent '$agentName' will connect automatically`n`n" +
-                        "DASHBOARD SETUP:`n" +
-                        "  Open the coordinator's dashboard`n" +
-                        "  When prompted, enter your shared secret as the Bearer token.`n" +
+                    $script:txtWhatsNext.Text = "What's next:`r`n`r`n" +
+                        "  - The worker is running as a Windows service (starts on boot)`r`n" +
+                        "  - Ensure the coordinator is running`r`n" +
+                        "  - Your agent '$agentName' will connect automatically`r`n`r`n" +
+                        "DASHBOARD SETUP:`r`n" +
+                        "  Open the coordinator's dashboard`r`n" +
+                        "  When prompted, enter your shared secret as the Bearer token.`r`n" +
                         "  Your shared secret is: $secretHint"
                 } else {
-                    $script:txtWhatsNext.Text = "What's next:`n`n" +
-                        "  - The worker has been started in the background`n" +
-                        "  - Ensure the coordinator is running`n" +
-                        "  - Your agent '$agentName' will connect automatically`n" +
-                        "  - To restart later: npm run worker`n`n" +
-                        "DASHBOARD SETUP:`n" +
-                        "  Open the coordinator's dashboard`n" +
-                        "  When prompted, enter your shared secret as the Bearer token.`n" +
+                    $script:txtWhatsNext.Text = "What's next:`r`n`r`n" +
+                        "  - The worker has been started in the background`r`n" +
+                        "  - Ensure the coordinator is running`r`n" +
+                        "  - Your agent '$agentName' will connect automatically`r`n" +
+                        "  - To restart later: npm run worker`r`n`r`n" +
+                        "DASHBOARD SETUP:`r`n" +
+                        "  Open the coordinator's dashboard`r`n" +
+                        "  When prompted, enter your shared secret as the Bearer token.`r`n" +
                         "  Your shared secret is: $secretHint"
                 }
             }
