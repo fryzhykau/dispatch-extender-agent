@@ -956,6 +956,40 @@ $p7.Controls.Add($btnViewLogs)
 $panels[6] = $p7
 
 # ---------------------------------------------------------------------------
+# STEP 8: Launching (relay startup with progress)
+# ---------------------------------------------------------------------------
+$p8 = New-Object System.Windows.Forms.Panel
+$p8.Dock = "Fill"
+$p8.BackColor = $C_BG
+
+$script:lblLaunchIcon = New-StyledLabel -Text "" -X 200 -Y 40 -Width 60 -Height 50 -Font (New-Object System.Drawing.Font("Segoe UI", 30)) -Color $C_ACCENT
+$script:lblLaunchIcon.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+$p8.Controls.Add($script:lblLaunchIcon)
+
+$script:lblLaunchTitle = New-StyledLabel -Text "Starting Relay..." -X 20 -Y 90 -Width 460 -Height 30 -Font $F_TITLE -Color $C_ACCENT
+$script:lblLaunchTitle.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+$p8.Controls.Add($script:lblLaunchTitle)
+
+$script:lblLaunchStatus = New-StyledLabel -Text "Preparing to start the relay server..." -X 20 -Y 140 -Width 460 -Height 25 -Font $F_NORMAL -Color $C_TEXTDIM
+$script:lblLaunchStatus.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+$p8.Controls.Add($script:lblLaunchStatus)
+
+$script:pbLaunch = New-Object System.Windows.Forms.ProgressBar
+$script:pbLaunch.Location = New-Object System.Drawing.Point((S 60), (S 185))
+$script:pbLaunch.Size = New-Object System.Drawing.Size((S 380), (S 18))
+$script:pbLaunch.Style = "Continuous"
+$script:pbLaunch.Minimum = 0
+$script:pbLaunch.Maximum = 100
+$script:pbLaunch.Value = 0
+$p8.Controls.Add($script:pbLaunch)
+
+$script:lblLaunchDetail = New-StyledLabel -Text "" -X 20 -Y 220 -Width 460 -Height 80 -Font $F_SMALL -Color $C_TEXTDIM
+$script:lblLaunchDetail.TextAlign = [System.Drawing.ContentAlignment]::TopCenter
+$p8.Controls.Add($script:lblLaunchDetail)
+
+$panels[8] = $p8
+
+# ---------------------------------------------------------------------------
 # STEP 10: Basic Config (basic mode)
 # ---------------------------------------------------------------------------
 $p10 = New-Object System.Windows.Forms.Panel
@@ -1075,16 +1109,17 @@ function Show-Step {
     $isReview = ($StepIndex -eq 4)
     $isInstalling = ($StepIndex -eq 5)
     $isComplete = ($StepIndex -eq 6)
+    $isLaunching = ($StepIndex -eq 8)
 
     # Navigation button visibility
-    $btnBack.Visible = ($flowIdx -gt 0) -and (-not $isInstalling) -and (-not $isComplete)
-    $btnCancel.Visible = (-not $isInstalling) -and (-not $isComplete)
+    $btnBack.Visible = ($flowIdx -gt 0) -and (-not $isInstalling) -and (-not $isComplete) -and (-not $isLaunching)
+    $btnCancel.Visible = (-not $isInstalling) -and (-not $isComplete) -and (-not $isLaunching)
 
     if ($isReview) {
         $btnNext.Text = "Install"
         $btnNext.BackColor = $C_HIGHLIGHT
         $btnNext.Visible = $true
-    } elseif ($isInstalling) {
+    } elseif ($isInstalling -or $isLaunching) {
         $btnNext.Visible = $false
         $btnBack.Visible = $false
         $btnCancel.Visible = $false
@@ -1519,11 +1554,22 @@ function Run-Installation {
     # --- Step: Deploy orchestrate skill (coordinator only) ---
     if ($role -eq "coordinator") {
         Write-InstallLog "Deploying orchestrate skill for Claude Code..." "INFO"
-        $skillDir = Join-Path (Join-Path $ProjectRoot ".claude") "commands"
-        $skillSource = Join-Path $skillDir "orchestrate.md"
+        $skillSource = Join-Path (Join-Path $ProjectRoot ".claude") "commands\orchestrate.md"
         if (Test-Path $skillSource) {
-            Write-InstallLog "Orchestrate skill available at $skillDir" "OK"
-            Write-InstallLog "Use /orchestrate in Claude Code to dispatch tasks across agents." "INFO"
+            # Deploy to user's global ~/.claude/commands/ so it works in any project
+            $globalDir = Join-Path $env:USERPROFILE ".claude\commands"
+            if (-not (Test-Path $globalDir)) {
+                New-Item -ItemType Directory -Path $globalDir -Force | Out-Null
+            }
+            $globalDest = Join-Path $globalDir "orchestrate.md"
+            try {
+                Copy-Item -Path $skillSource -Destination $globalDest -Force
+                Write-InstallLog "Orchestrate skill deployed to $globalDir" "OK"
+                Write-InstallLog "Use /orchestrate in Claude Code to dispatch tasks across agents." "INFO"
+            } catch {
+                Write-InstallLog "Failed to deploy skill to $globalDir`: $_" "FAIL"
+                Write-InstallLog "You can manually copy .claude\commands\orchestrate.md to $globalDir" "INFO"
+            }
         } else {
             Write-InstallLog "Orchestrate skill not found in .claude/commands/ - skipped." "SKIP"
         }
@@ -1864,25 +1910,85 @@ $btnNext.Add_Click({
     if ($step -eq 6) {
         # Finish — launch relay + dashboard if checkbox is checked
         if ($script:cbStartRelay -and $script:cbStartRelay.Checked) {
+            # Show the launching panel
+            Show-Step 8
+            [System.Windows.Forms.Application]::DoEvents()
+
             $port = if ($script:SetupMode -eq "basic") { $script:txtBasicPort.Text } elseif ($script:SelectedRole -eq "coordinator") { $script:txtPort.Text } else { "7070" }
             $proto = if ($script:SetupMode -eq "advanced" -and $script:cbEnableTLS.Checked) { "https" } else { "http" }
 
-            # Kill any existing process on the relay port
+            # Step 1: Kill existing process
+            $script:lblLaunchStatus.Text = "Checking for existing processes on port $port..."
+            $script:pbLaunch.Value = 10
+            [System.Windows.Forms.Application]::DoEvents()
             try {
                 $existing = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | Select-Object -First 1
                 if ($existing) {
+                    $script:lblLaunchDetail.Text = "Stopping existing process (PID $($existing.OwningProcess))..."
+                    [System.Windows.Forms.Application]::DoEvents()
                     Stop-Process -Id $existing.OwningProcess -Force -ErrorAction SilentlyContinue
                     Start-Sleep -Milliseconds 500
                 }
             } catch {}
 
+            # Step 2: Start relay
+            $script:lblLaunchStatus.Text = "Starting relay server..."
+            $script:lblLaunchDetail.Text = "Running: node relay/server.js"
+            $script:pbLaunch.Value = 30
+            [System.Windows.Forms.Application]::DoEvents()
+
             $cmdArgs = "/C title Dispatch Relay & node relay/server.js || (echo. & echo Relay stopped. Press any key to close. & pause >nul)"
             Start-Process cmd.exe -ArgumentList $cmdArgs -WorkingDirectory $ProjectRoot -WindowStyle Minimized
-            Start-Sleep -Seconds 3
-            # Pass the shared secret as a URL param so the dashboard auto-configures
+
+            # Step 3: Poll until relay responds or timeout
+            $script:lblLaunchStatus.Text = "Waiting for relay to start..."
+            $script:pbLaunch.Value = 50
+            [System.Windows.Forms.Application]::DoEvents()
+
             $secret = if ($script:SetupMode -eq "basic") { $script:txtBasicSecret.Text } else { $script:txtSecretCoord.Text }
+            $relayReady = $false
+            $maxAttempts = 15
+            for ($i = 1; $i -le $maxAttempts; $i++) {
+                $pct = 50 + [int](($i / $maxAttempts) * 40)
+                $script:pbLaunch.Value = [Math]::Min($pct, 90)
+                $dots = "." * (($i % 3) + 1)
+                $script:lblLaunchStatus.Text = "Waiting for relay to start$dots"
+                $script:lblLaunchDetail.Text = "Checking $proto`://localhost:$port/status (attempt $i of $maxAttempts)"
+                [System.Windows.Forms.Application]::DoEvents()
+                Start-Sleep -Milliseconds 700
+                try {
+                    $headers = @{ "Authorization" = "Bearer $secret" }
+                    $resp = Invoke-WebRequest -Uri "$proto`://localhost:$port/status" -Headers $headers -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
+                    if ($resp.StatusCode -eq 200) {
+                        $relayReady = $true
+                        break
+                    }
+                } catch {}
+            }
+
+            # Step 4: Open dashboard
+            $script:pbLaunch.Value = 100
+            if ($relayReady) {
+                $script:lblLaunchIcon.Text = [char]0x2713
+                $script:lblLaunchIcon.ForeColor = $C_SUCCESS
+                $script:lblLaunchTitle.Text = "Relay is Running!"
+                $script:lblLaunchTitle.ForeColor = $C_SUCCESS
+                $script:lblLaunchStatus.Text = "Opening dashboard in your browser..."
+                $script:lblLaunchDetail.Text = "Relay responding on port $port"
+            } else {
+                $script:lblLaunchIcon.Text = "!"
+                $script:lblLaunchIcon.ForeColor = [System.Drawing.Color]::FromArgb(255, 183, 77)
+                $script:lblLaunchTitle.Text = "Relay Starting..."
+                $script:lblLaunchTitle.ForeColor = [System.Drawing.Color]::FromArgb(255, 183, 77)
+                $script:lblLaunchStatus.Text = "Opening dashboard (relay may still be loading)..."
+                $script:lblLaunchDetail.Text = "The relay did not respond yet, but it may still be starting up.`r`nThe dashboard will retry automatically."
+            }
+            [System.Windows.Forms.Application]::DoEvents()
+            Start-Sleep -Milliseconds 800
+
             $encodedSecret = [System.Uri]::EscapeDataString($secret)
             Start-Process "$proto`://localhost:$port/dashboard?token=$encodedSecret"
+            Start-Sleep -Milliseconds 500
         }
         $form.Close()
         return
