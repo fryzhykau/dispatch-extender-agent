@@ -417,9 +417,32 @@ begin
   end;
 end;
 
-// Confirm uninstall — remind user about services
+// Confirm uninstall — remind user about services and skill
 function InitializeUninstall: Boolean;
 begin
-  Result := MsgBox('This will uninstall {#MyAppName} and remove any associated Windows services.' + #13#10 + #13#10 +
+  Result := MsgBox('This will uninstall {#MyAppName} and:' + #13#10 + #13#10 +
+                   '  - Stop and remove Windows services' + #13#10 +
+                   '  - Stop any running relay/worker processes' + #13#10 +
+                   '  - Remove the /orchestrate Claude Code skill' + #13#10 +
+                   '  - Delete logs, data, certs, and node_modules' + #13#10 + #13#10 +
                    'Continue?', mbConfirmation, MB_YESNO) = IDYES;
+end;
+
+// Remove the global Claude Code orchestrate skill after uninstall
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  SkillDir: String;
+begin
+  if CurUninstallStep = usPostUninstall then
+  begin
+    SkillDir := ExpandConstant('{userappdata}\..\..\.claude\skills\orchestrate');
+    if not DirExists(SkillDir) then
+      SkillDir := ExpandConstant('{%USERPROFILE}\.claude\skills\orchestrate');
+    if DirExists(SkillDir) then
+    begin
+      DelTree(SkillDir, True, True, True);
+      // Clean up empty parent if no other skills remain
+      RemoveDir(ExpandConstant('{%USERPROFILE}\.claude\skills'));
+    end;
+  end;
 end;
