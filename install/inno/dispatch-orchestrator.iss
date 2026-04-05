@@ -219,6 +219,33 @@ begin
   end;
 end;
 
+// Check if Claude Code CLI is available on PATH
+function ClaudeCliInstalled: Boolean;
+var
+  ResultCode: Integer;
+begin
+  Result := Exec('cmd.exe', '/C claude --version', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+            and (ResultCode = 0);
+end;
+
+// Retrieve the installed Claude CLI version string
+function GetClaudeVersion: String;
+var
+  TmpFile: String;
+  Lines: TArrayOfString;
+  ResultCode: Integer;
+begin
+  Result := '(not found)';
+  TmpFile := ExpandConstant('{tmp}\claudeversion.txt');
+  if Exec('cmd.exe', '/C claude --version > "' + TmpFile + '" 2>&1', '',
+           SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    if LoadStringsFromFile(TmpFile, Lines) and (GetArrayLength(Lines) > 0) then
+      Result := Trim(Lines[0]);
+    DeleteFile(TmpFile);
+  end;
+end;
+
 // Check if NSSM is available on PATH
 function NssmInstalled: Boolean;
 var
@@ -274,6 +301,7 @@ procedure UpdatePrereqPage;
 var
   NodeVer: String;
   NodeMajor: Integer;
+  ClaudeVer: String;
   Info: String;
 begin
   Info := '';
@@ -298,6 +326,21 @@ begin
 
   Info := Info + #13#10;
 
+  // --- Claude Code CLI ---
+  if ClaudeCliInstalled then
+  begin
+    ClaudeVer := GetClaudeVersion;
+    Info := Info + '[OK]  Claude Code CLI is installed: ' + ClaudeVer + #13#10;
+  end
+  else
+  begin
+    Info := Info + '[!!]  Claude Code CLI is NOT installed.' + #13#10;
+    Info := Info + '      Required for Dispatch integration and task orchestration.' + #13#10;
+    Info := Info + '      Install: npm install -g @anthropic-ai/claude-code' + #13#10;
+  end;
+
+  Info := Info + #13#10;
+
   // --- NSSM ---
   if NssmInstalled then
     Info := Info + '[OK]  NSSM is installed (Windows service helper).' + #13#10
@@ -310,8 +353,15 @@ begin
 
   Info := Info + #13#10;
   Info := Info + '---------------------------------------------' + #13#10;
-  Info := Info + 'You may continue the installation even if Node.js is missing,' + #13#10;
-  Info := Info + 'but you will need to install it before running the application.' + #13#10;
+  Info := Info + 'ORCHESTRATE SKILL' + #13#10;
+  Info := Info + 'This installer includes a Claude Code custom command' + #13#10;
+  Info := Info + '(/orchestrate) that teaches Claude how to dispatch tasks' + #13#10;
+  Info := Info + 'across your agent network. When invoked via Dispatch,' + #13#10;
+  Info := Info + 'Claude will automatically check agent status, decompose' + #13#10;
+  Info := Info + 'tasks, route subtasks to workers, and aggregate results.' + #13#10;
+  Info := Info + #13#10;
+  Info := Info + 'You may continue even if prerequisites are missing,' + #13#10;
+  Info := Info + 'but you will need to install them before running.' + #13#10;
 
   PrereqMemo.Text := Info;
 end;
@@ -345,6 +395,20 @@ begin
                 mbConfirmation, MB_YESNO) = IDYES then
       begin
         ShellExec('open', 'https://nodejs.org/en/download/', '', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
+      end;
+    end;
+
+    // If Claude CLI is missing, offer to install it
+    if not ClaudeCliInstalled then
+    begin
+      if MsgBox('Claude Code CLI was not found on this system.' + #13#10 + #13#10 +
+                'The orchestrator needs Claude Code for Dispatch integration' + #13#10 +
+                'and to use the /orchestrate skill for multi-machine task routing.' + #13#10 + #13#10 +
+                'Install it now? (requires npm)',
+                mbConfirmation, MB_YESNO) = IDYES then
+      begin
+        Exec('cmd.exe', '/C npm install -g @anthropic-ai/claude-code', '',
+             SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode);
       end;
     end;
   end;
