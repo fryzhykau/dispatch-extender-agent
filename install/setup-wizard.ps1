@@ -939,7 +939,22 @@ $p7.Controls.Add($script:txtWhatsNext)
 $script:cbStartRelay = New-StyledCheckBox -Text "Start the Relay and open the Dashboard" -X 20 -Y 368 -Width 350 -Checked $true
 $p7.Controls.Add($script:cbStartRelay)
 
-$btnViewLogs = New-StyledButton -Text "View Logs" -X 380 -Y 366 -Width 100 -Height 30
+$script:btnCoworkPrompt = New-StyledButton -Text "Copy Cowork Prompt" -X 20 -Y 400 -Width 160 -Height 30
+$script:btnCoworkPrompt.Add_Click({
+    if ($script:CoworkPrompt) {
+        [System.Windows.Forms.Clipboard]::SetText($script:CoworkPrompt)
+        $script:btnCoworkPrompt.Text = "Copied!"
+        $timer = New-Object System.Windows.Forms.Timer
+        $timer.Interval = 2000
+        $timer.Add_Tick({ $script:btnCoworkPrompt.Text = "Copy Cowork Prompt"; $timer.Stop(); $timer.Dispose() })
+        $timer.Start()
+    } else {
+        [void][System.Windows.Forms.MessageBox]::Show("Cowork prompt was not generated during installation.", "Not Available", "OK", "Information")
+    }
+})
+$p7.Controls.Add($script:btnCoworkPrompt)
+
+$btnViewLogs = New-StyledButton -Text "View Logs" -X 380 -Y 400 -Width 100 -Height 30
 $btnViewLogs.Add_Click({
     # Logs are in ProgramData when installed to Program Files
     $logsDir = Join-Path (Join-Path $env:ProgramData "DispatchOrchestrator") "logs"
@@ -1583,6 +1598,29 @@ function Run-Installation {
                 Write-InstallLog "Failed to deploy skill to $globalDir`: $_" "FAIL"
                 Write-InstallLog "You can manually copy .claude\skills\orchestrate\SKILL.md to $globalDir" "INFO"
             }
+
+            # Deploy to Cowork skills directory (OneDrive\Documents\Claude\Skills\)
+            $coworkBaseDir = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "Claude\Skills\orchestrate"
+            try {
+                if (-not (Test-Path $coworkBaseDir)) {
+                    New-Item -ItemType Directory -Path $coworkBaseDir -Force | Out-Null
+                }
+                $coworkDest = Join-Path $coworkBaseDir "SKILL.md"
+                [System.IO.File]::WriteAllText($coworkDest, $skillContent, $utf8NoBom)
+                Write-InstallLog "Cowork skill deployed to $coworkBaseDir" "OK"
+            } catch {
+                Write-InstallLog "Failed to deploy Cowork skill: $_" "FAIL"
+            }
+
+            # Also generate a Cowork/Dispatch skill-creator prompt as fallback
+            $promptTemplate = Join-Path (Join-Path $ProjectRoot "install") "cowork-skill-prompt.txt"
+            if (Test-Path $promptTemplate) {
+                $promptContent = [System.IO.File]::ReadAllText($promptTemplate)
+                $promptContent = $promptContent -replace '\{\{SECRET\}\}', $cfgSecret
+                $promptContent = $promptContent -replace '\{\{PIN\}\}', $cfgPin
+                $promptContent = $promptContent -replace '\{\{PORT\}\}', $cfgPort
+                $script:CoworkPrompt = $promptContent
+            }
         } else {
             Write-InstallLog "Orchestrate skill not found in .claude/skills/orchestrate/ - skipped." "SKIP"
         }
@@ -1862,6 +1900,14 @@ $btnNext.Add_Click({
                 $secretHint = $secret.Substring(0, [Math]::Min(4, $secret.Length)) + "...." + $secret.Substring([Math]::Max(0, $secret.Length - 4))
                 $svcInstalled = ($script:SetupMode -eq "advanced") -and $script:cbInstallService.Checked
                 $script:lblCompleteSummary.Text = "Your machine has been configured as the Orchestrator.`nThe relay server is configured on port $port.`nShared secret has been set in relay/config.json."
+                $coworkSection = `
+                    "`r`n`r`nCOWORK / DISPATCH SETUP`r`n" +
+                    "----------------------------------------------------`r`n`r`n" +
+                    "To use /orchestrate from Claude Cowork or Dispatch:`r`n`r`n" +
+                    "1.  Open Claude Cowork on this machine`r`n" +
+                    "2.  Type: /skill-creator`r`n" +
+                    "3.  Click 'Copy Cowork Prompt' below and paste it`r`n" +
+                    "4.  The skill-creator will set up /orchestrate for you`r`n"
                 if ($svcInstalled) {
                     $script:txtWhatsNext.Text = `
                         "NEXT STEPS`r`n" +
@@ -1872,7 +1918,8 @@ $btnNext.Add_Click({
                         "DASHBOARD LOGIN`r`n" +
                         "----------------------------------------------------`r`n`r`n" +
                         "When prompted, enter your shared secret as the Bearer token:`r`n`r`n" +
-                        "    $secretHint`r`n"
+                        "    $secretHint`r`n" +
+                        $coworkSection
                 } else {
                     $script:txtWhatsNext.Text = `
                         "NEXT STEPS`r`n" +
@@ -1884,7 +1931,8 @@ $btnNext.Add_Click({
                         "DASHBOARD LOGIN`r`n" +
                         "----------------------------------------------------`r`n`r`n" +
                         "When prompted, enter your shared secret as the Bearer token:`r`n`r`n" +
-                        "    $secretHint`r`n"
+                        "    $secretHint`r`n" +
+                        $coworkSection
                 }
             } else {
                 $agentName = $script:txtAgentName.Text

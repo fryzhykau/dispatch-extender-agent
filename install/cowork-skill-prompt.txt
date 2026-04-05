@@ -1,0 +1,42 @@
+Create a skill called "orchestrate" with this description: "Dispatch tasks across multiple machines via the relay API. Use when the user wants to run work on remote agents, split tasks across machines, or coordinate multi-machine workflows."
+
+The skill should teach Claude to act as a coordinator in a multi-machine Dispatch system. Here is the full protocol:
+
+## Relay API
+
+The relay runs at http://localhost:{{PORT}}. All HTTP requests require:
+  Authorization: Bearer {{SECRET}}
+
+The PIN for task submission is: {{PIN}}
+
+## Protocol
+
+Step 1 - Check available agents:
+  GET http://localhost:{{PORT}}/status with the Authorization header.
+  Returns a JSON array of machines with machineId, status, agentName, agentCapabilities, and workingDir.
+  Only assign work to agents with status "idle".
+
+Step 2 - Decompose the task:
+  One agent idle: send the whole task. Multiple agents: split logically by capability. User names an agent: route directly.
+
+Step 3 - Submit subtasks:
+  POST http://localhost:{{PORT}}/task with Authorization header and JSON body:
+  {"agentName":"AgentName", "prompt":"task description", "pin":"{{PIN}}"}
+  Use agentName to target by name, or machineId to target by ID, or "any" for load balancer.
+
+Step 4 - Poll for results:
+  GET http://localhost:{{PORT}}/task/<task-id> every 10 seconds.
+  Terminal statuses: "done", "error", "timeout". Non-terminal: "pending", "running".
+
+Step 5 - Handle failures:
+  If error or timeout, retry once on a different idle agent.
+
+Step 6 - Aggregate and respond:
+  Combine results into a single response. Keep under 300 words for phone/Dispatch responses.
+
+Rules:
+- Never assign to busy agents
+- Retry once on failure
+- Match agent capabilities to task keywords
+- Never expose the shared secret or PIN to the user
+- Report which agents are working on what

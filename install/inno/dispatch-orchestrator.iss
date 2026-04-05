@@ -432,17 +432,26 @@ end;
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   SkillDir: String;
+  CoworkDir: String;
 begin
   if CurUninstallStep = usPostUninstall then
   begin
+    // Remove Claude Code skill (~/.claude/skills/orchestrate/)
     SkillDir := ExpandConstant('{userappdata}\..\..\.claude\skills\orchestrate');
     if not DirExists(SkillDir) then
       SkillDir := ExpandConstant('{%USERPROFILE}\.claude\skills\orchestrate');
     if DirExists(SkillDir) then
     begin
       DelTree(SkillDir, True, True, True);
-      // Clean up empty parent if no other skills remain
       RemoveDir(ExpandConstant('{%USERPROFILE}\.claude\skills'));
+    end;
+
+    // Remove Cowork skill (Documents\Claude\Skills\orchestrate\)
+    CoworkDir := ExpandConstant('{userdocs}\Claude\Skills\orchestrate');
+    if DirExists(CoworkDir) then
+    begin
+      DelTree(CoworkDir, True, True, True);
+      RemoveDir(ExpandConstant('{userdocs}\Claude\Skills'));
     end;
   end;
 end;

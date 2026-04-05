@@ -118,8 +118,49 @@ describe('setup wizard deploys orchestrate skill', () => {
 
   it('setup wizard should deploy skill only for coordinator role', () => {
     const wizardContent = fs.readFileSync(wizardPath, 'utf-8');
-    // The skill deployment block should be conditional on coordinator role
     assert.ok(wizardContent.includes('coordinator') && wizardContent.includes('orchestrate'),
       'Setup wizard should deploy skill for coordinator role');
+  });
+
+  it('setup wizard should bake secret and PIN into skill', () => {
+    const wizardContent = fs.readFileSync(wizardPath, 'utf-8');
+    assert.ok(wizardContent.includes('cfgSecret') && wizardContent.includes('cfgPin'),
+      'Setup wizard should inject secret and PIN into skill');
+  });
+
+  it('setup wizard should have a Copy Cowork Prompt button', () => {
+    const wizardContent = fs.readFileSync(wizardPath, 'utf-8');
+    assert.ok(wizardContent.includes('Copy Cowork Prompt'),
+      'Setup wizard should have Cowork prompt copy button');
+  });
+});
+
+describe('Cowork skill-creator prompt template', () => {
+  const promptPath = path.join(ROOT, 'install', 'cowork-skill-prompt.txt');
+
+  it('should exist', () => {
+    assert.ok(fs.existsSync(promptPath), 'Cowork prompt template missing');
+  });
+
+  it('should contain placeholders for secret, PIN, and port', () => {
+    const content = fs.readFileSync(promptPath, 'utf-8');
+    assert.ok(content.includes('{{SECRET}}'), 'Missing {{SECRET}} placeholder');
+    assert.ok(content.includes('{{PIN}}'), 'Missing {{PIN}} placeholder');
+    assert.ok(content.includes('{{PORT}}'), 'Missing {{PORT}} placeholder');
+  });
+
+  it('should reference the orchestrate skill name', () => {
+    const content = fs.readFileSync(promptPath, 'utf-8');
+    assert.ok(content.includes('"orchestrate"'), 'Missing skill name');
+  });
+
+  it('should include the full protocol (all 6 steps)', () => {
+    const content = fs.readFileSync(promptPath, 'utf-8');
+    assert.ok(content.includes('Step 1'), 'Missing Step 1');
+    assert.ok(content.includes('Step 2'), 'Missing Step 2');
+    assert.ok(content.includes('Step 3'), 'Missing Step 3');
+    assert.ok(content.includes('Step 4'), 'Missing Step 4');
+    assert.ok(content.includes('Step 5'), 'Missing Step 5');
+    assert.ok(content.includes('Step 6'), 'Missing Step 6');
   });
 });
