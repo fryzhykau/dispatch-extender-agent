@@ -1556,15 +1556,28 @@ function Run-Installation {
         Write-InstallLog "Deploying orchestrate skill for Claude Code..." "INFO"
         $skillSource = Join-Path (Join-Path $ProjectRoot ".claude") "skills\orchestrate\SKILL.md"
         if (Test-Path $skillSource) {
+            # Read the configured secret and PIN
+            $cfgSecret = if ($script:SetupMode -eq "basic") { $script:txtBasicSecret.Text } else { $script:txtSecretCoord.Text }
+            $cfgPin = if ($script:SetupMode -eq "basic") { $script:txtBasicPin.Text } else { $script:txtPinCode.Text }
+            $cfgPort = if ($script:SetupMode -eq "basic") { $script:txtBasicPort.Text } else { $script:txtPort.Text }
+
+            # Read the template and inject actual values
+            $skillContent = [System.IO.File]::ReadAllText($skillSource)
+            $skillContent = $skillContent -replace '<shared-secret>', $cfgSecret
+            $skillContent = $skillContent -replace '"pin": "1234"', "`"pin`": `"$cfgPin`""
+            $skillContent = $skillContent -replace 'http://localhost:7070', "http://localhost:$cfgPort"
+
             # Deploy to user's global ~/.claude/skills/orchestrate/ so it works in any project
             $globalDir = Join-Path $env:USERPROFILE ".claude\skills\orchestrate"
             if (-not (Test-Path $globalDir)) {
                 New-Item -ItemType Directory -Path $globalDir -Force | Out-Null
             }
             $globalDest = Join-Path $globalDir "SKILL.md"
+            $utf8NoBom = New-Object System.Text.UTF8Encoding $false
             try {
-                Copy-Item -Path $skillSource -Destination $globalDest -Force
+                [System.IO.File]::WriteAllText($globalDest, $skillContent, $utf8NoBom)
                 Write-InstallLog "Orchestrate skill deployed to $globalDir" "OK"
+                Write-InstallLog "Shared secret and PIN configured in skill." "OK"
                 Write-InstallLog "Use /orchestrate in Claude Code to dispatch tasks across agents." "INFO"
             } catch {
                 Write-InstallLog "Failed to deploy skill to $globalDir`: $_" "FAIL"
