@@ -10,7 +10,7 @@ You are the coordinator in a multi-machine Claude Dispatch system. When the user
 
 **Install directory:** `<install-dir>`
 
-**Important:** The relay runs on `localhost`. This skill requires local machine access. If running in a cloud sandbox (Cowork), you MUST request a local code session first — ask to trust ONLY the install directory above. Do NOT request access to any other directory. All relay API calls use `curl` — no filesystem access outside the install directory is needed.
+**Important:** The relay runs on `localhost`. This skill requires local machine access. If running in a cloud sandbox (Cowork), you MUST request a local code session with the working directory set to `<install-dir>` — NOT Documents or any other folder. Only trust and access the install directory above. All relay API calls use `curl` — no filesystem access outside the install directory is needed.
 
 ## Relay API
 
