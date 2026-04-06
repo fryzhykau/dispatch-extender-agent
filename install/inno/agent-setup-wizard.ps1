@@ -123,6 +123,7 @@ $script:Config = @{
     installService     = $false
     startAfterSetup    = $true
     maxOutputLength    = 1000000
+    installPlaywright  = $false
 }
 
 # ---------------------------------------------------------------------------
@@ -658,23 +659,26 @@ if (-not $nssmAvailable) {
     New-StyledLabel -Parent $p4 -Text "NSSM detected. Agent will start automatically with Windows." -X 48 -Y 184 -Width 400 -Height 18 -Font $FontSmall -ForeColor $ColorGreen | Out-Null
 }
 
-$script:chkStartAfter = New-StyledCheckBox -Parent $p4 -Text "Start agent after setup completes" -X 20 -Y 214 -Width 430 -Checked $true
+$script:chkPlaywright = New-StyledCheckBox -Parent $p4 -Text "Install Playwright MCP (browser automation)" -X 20 -Y 214 -Width 430 -Checked $false
+New-StyledLabel -Parent $p4 -Text "Gives the agent a real browser to navigate, click, type, and screenshot" -X 48 -Y 240 -Width 400 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
-New-StyledLabel -Parent $p4 -Text "Allowed Tools" -X 20 -Y 254 -Width 200 -Height 20 -Font $FontLabel | Out-Null
-New-StyledLabel -Parent $p4 -Text "Which Claude tools this agent may use" -X 20 -Y 274 -Width 400 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+$script:chkStartAfter = New-StyledCheckBox -Parent $p4 -Text "Start agent after setup completes" -X 20 -Y 270 -Width 430 -Checked $true
 
-$script:chkToolBrowser  = New-StyledCheckBox -Parent $p4 -Text "Browser (WebFetch, WebSearch)" -X 20 -Y 294 -Width 220 -Checked $true
-$script:chkToolCode     = New-StyledCheckBox -Parent $p4 -Text "Code (Read, Edit, Write)" -X 250 -Y 294 -Width 200 -Checked $true
-$script:chkToolBash     = New-StyledCheckBox -Parent $p4 -Text "Shell (Bash commands)" -X 20 -Y 318 -Width 220 -Checked $true
-$script:chkToolCustom   = New-StyledCheckBox -Parent $p4 -Text "Custom:" -X 250 -Y 318 -Width 70
-$script:txtCustomTools  = New-StyledTextBox -Parent $p4 -Text "" -X 326 -Y 318 -Width 130
+New-StyledLabel -Parent $p4 -Text "Allowed Tools" -X 20 -Y 310 -Width 200 -Height 20 -Font $FontLabel | Out-Null
+New-StyledLabel -Parent $p4 -Text "Which Claude tools this agent may use" -X 20 -Y 330 -Width 400 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+
+$script:chkToolBrowser  = New-StyledCheckBox -Parent $p4 -Text "Browser (WebFetch, WebSearch)" -X 20 -Y 350 -Width 220 -Checked $true
+$script:chkToolCode     = New-StyledCheckBox -Parent $p4 -Text "Code (Read, Edit, Write)" -X 250 -Y 350 -Width 200 -Checked $true
+$script:chkToolBash     = New-StyledCheckBox -Parent $p4 -Text "Shell (Bash commands)" -X 20 -Y 374 -Width 220 -Checked $true
+$script:chkToolCustom   = New-StyledCheckBox -Parent $p4 -Text "Custom:" -X 250 -Y 374 -Width 70
+$script:txtCustomTools  = New-StyledTextBox -Parent $p4 -Text "" -X 326 -Y 374 -Width 130
 $script:txtCustomTools.Enabled = $false
 $script:chkToolCustom.Add_CheckedChanged({ $script:txtCustomTools.Enabled = $script:chkToolCustom.Checked })
 
-New-StyledLabel -Parent $p4 -Text "Max Output Size" -X 20 -Y 358 -Width 200 -Height 20 -Font $FontLabel | Out-Null
+New-StyledLabel -Parent $p4 -Text "Max Output Size" -X 20 -Y 414 -Width 200 -Height 20 -Font $FontLabel | Out-Null
 $script:cmbMaxOutput = New-Object System.Windows.Forms.ComboBox
 $script:cmbMaxOutput.DropDownStyle = "DropDownList"
-$script:cmbMaxOutput.Location = New-Object System.Drawing.Point((S 20), (S 380))
+$script:cmbMaxOutput.Location = New-Object System.Drawing.Point((S 20), (S 436))
 $script:cmbMaxOutput.Size = New-Object System.Drawing.Size((S 180), (S 28))
 $script:cmbMaxOutput.Font = $FontBody
 $script:cmbMaxOutput.BackColor = $ColorInputBg
@@ -683,7 +687,7 @@ $script:cmbMaxOutput.FlatStyle = "Flat"
 $script:cmbMaxOutput.Items.AddRange(@("100 KB", "500 KB", "1 MB", "5 MB", "10 MB"))
 $script:cmbMaxOutput.SelectedIndex = 2  # 1 MB default
 $p4.Controls.Add($script:cmbMaxOutput)
-New-StyledLabel -Parent $p4 -Text "Max task output returned to the orchestrator" -X 210 -Y 382 -Width 240 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
+New-StyledLabel -Parent $p4 -Text "Max task output returned to the orchestrator" -X 210 -Y 438 -Width 240 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
 $panels[4] = $p4
 
@@ -928,6 +932,7 @@ function Collect-Config {
         $script:Config.installService = $false
         $script:Config.startAfterSetup = $true
         $script:Config.maxOutputLength = 1000000
+        $script:Config.installPlaywright = $false
         $script:Config.allowedTools = @("Read", "Edit", "Write", "Bash", "Glob", "Grep", "WebFetch", "WebSearch")
         $script:Config.disallowedTools = @()
     } else {
@@ -954,6 +959,7 @@ function Collect-Config {
         $script:Config.keepAwake = $script:chkKeepAwake.Checked
         $script:Config.enableTls = $script:chkTls.Checked
         $script:Config.installService = $script:chkService.Checked
+        $script:Config.installPlaywright = $script:chkPlaywright.Checked
         $script:Config.startAfterSetup = $script:chkStartAfter.Checked
 
         $outputMap = @{
@@ -1115,6 +1121,7 @@ function Show-Step {
   Keep Awake:        $($c.keepAwake)
   TLS:               $($c.enableTls)
   Install Service:   $($c.installService)
+  Playwright MCP:    $($c.installPlaywright)
   Start After Setup: $($c.startAfterSetup)
   Max Output:        $($c.maxOutputLength) bytes
 
@@ -1265,9 +1272,58 @@ function Run-Install {
     } catch {
         Write-InstallLog "  ERROR: npm install failed: $_"
     }
-    $script:progressBar.Value = 50
+    $script:progressBar.Value = 45
 
-    # Step 4: Write worker-config.json
+    # Step 4: Install Playwright MCP (if selected)
+    if ($script:Config.installPlaywright) {
+        Write-InstallLog "Installing Playwright MCP server..."
+        try {
+            # Install @playwright/mcp and download Chromium browser
+            $pwResult = & cmd /C "npx -y @playwright/mcp@latest --help 2>&1"
+            Write-InstallLog "  Playwright MCP package cached."
+
+            Write-InstallLog "  Downloading Chromium browser (this may take a moment)..."
+            [System.Windows.Forms.Application]::DoEvents()
+            $pwInstall = & cmd /C "npx -y playwright install chromium 2>&1"
+            if ($LASTEXITCODE -eq 0) {
+                Write-InstallLog "  Chromium browser installed."
+            } else {
+                Write-InstallLog "  WARNING: Chromium download returned exit code $LASTEXITCODE"
+                Write-InstallLog "  You can install manually later: npx playwright install chromium"
+            }
+
+            # Configure Playwright MCP in user-level Claude settings (~/.claude.json)
+            $claudeConfig = Join-Path $env:USERPROFILE ".claude.json"
+            $mcpEntry = @{
+                type = "stdio"
+                command = "npx"
+                args = @("-y", "@playwright/mcp@latest")
+                env = @{ DISPLAY = ":1" }
+            }
+            if (Test-Path $claudeConfig) {
+                $config = Get-Content $claudeConfig -Raw | ConvertFrom-Json
+            } else {
+                $config = [PSCustomObject]@{}
+            }
+            if (-not $config.mcpServers) {
+                $config | Add-Member -NotePropertyName "mcpServers" -NotePropertyValue ([PSCustomObject]@{}) -Force
+            }
+            $config.mcpServers | Add-Member -NotePropertyName "playwright" -NotePropertyValue ([PSCustomObject]$mcpEntry) -Force
+            $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+            [System.IO.File]::WriteAllText($claudeConfig, ($config | ConvertTo-Json -Depth 10), $utf8NoBom)
+            Write-InstallLog "  Playwright MCP configured in ~/.claude.json"
+            Write-InstallLog "  The agent now has browser automation capabilities."
+        } catch {
+            Write-InstallLog "  ERROR: Playwright setup failed: $_"
+            Write-InstallLog "  You can install manually: npx playwright install chromium"
+            Write-InstallLog "  Then: claude mcp add playwright -- npx -y @playwright/mcp@latest"
+        }
+    } else {
+        Write-InstallLog "Playwright MCP installation skipped (not selected)."
+    }
+    $script:progressBar.Value = 55
+
+    # Step 5: Write worker-config.json (renumbered from Step 4)
     Write-InstallLog "Writing worker-config.json..."
     $json = Build-ConfigJson
     $utf8NoBom = New-Object System.Text.UTF8Encoding $false
