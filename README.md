@@ -659,7 +659,7 @@ The uninstaller automatically stops and removes Windows services, deletes `node_
 All tests must pass before pushing to any branch:
 
 ```bash
-npm test             # Run all 273 tests (unit, integration, static analysis, security)
+npm test             # Run all 276 tests (unit, integration, static analysis, security)
 npm run pii-check    # Scan for personal information in source code
 npm run precommit    # Runs both pii-check and tests
 ```
@@ -669,7 +669,7 @@ npm run precommit    # Runs both pii-check and tests
 | Suite | File | Tests | What it covers |
 |-------|------|-------|----------------|
 | Registry | `test/registry.test.js` | 27 | SQLite CRUD, filtering, pagination, persistence, task purging |
-| Server | `test/server.test.js` | 19 | HTTP API auth, validation, WebSocket auth, rate limiting, path traversal, favicon |
+| Server | `test/server.test.js` | 22 | HTTP API auth, validation, WebSocket auth/security, rate limiting, path traversal, duplicate registration, metadata validation |
 | Worker | `test/worker.test.js` | 13 | Path allowlist/denylist, normalization, traversal attacks |
 | Load Balancer | `test/load-balancer.test.js` | 14 | All 4 strategies, edge cases |
 | Config | `test/config.test.js` | 26 | Config loading, defaults, validation, merging |

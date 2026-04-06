@@ -443,6 +443,80 @@ describe('Relay server integration tests', () => {
   });
 
   // =========================================================================
+  // WebSocket Security
+  // =========================================================================
+
+  describe('WebSocket Security', () => {
+    it('should close stale connection when same machineId re-registers', async () => {
+      const ws1 = await openWs();
+      ws1.send(JSON.stringify({
+        type: 'register',
+        machineId: 'test-dup-machine',
+        token: SHARED_SECRET,
+      }));
+      await new Promise((r) => setTimeout(r, 500));
+      assert.equal(ws1.readyState, WebSocket.OPEN);
+
+      // Second connection with same machineId
+      const ws2 = await openWs();
+      const close1 = waitForClose(ws1);
+      ws2.send(JSON.stringify({
+        type: 'register',
+        machineId: 'test-dup-machine',
+        token: SHARED_SECRET,
+      }));
+
+      const { code } = await close1;
+      assert.equal(code, 4005, 'First connection should be closed with 4005');
+      assert.equal(ws2.readyState, WebSocket.OPEN, 'Second connection should remain open');
+
+      ws2.close();
+      await new Promise((r) => setTimeout(r, 300));
+    });
+
+    it('should validate agentCapabilities is a string array', async () => {
+      const ws = await openWs();
+      ws.send(JSON.stringify({
+        type: 'register',
+        machineId: 'test-bad-caps',
+        token: SHARED_SECRET,
+        agentCapabilities: { __proto__: { polluted: true } },
+      }));
+      await new Promise((r) => setTimeout(r, 500));
+
+      const res = await fetch(`${BASE_URL}/status`, { headers: authHeaders });
+      const body = await res.json();
+      const worker = body.find((w) => w.machineId === 'test-bad-caps');
+      assert.ok(worker, 'Worker should still register');
+      assert.ok(Array.isArray(worker.agentCapabilities), 'Capabilities should be an array');
+      assert.equal(worker.agentCapabilities.length, 0, 'Invalid capabilities should be rejected');
+
+      ws.close();
+      await new Promise((r) => setTimeout(r, 300));
+    });
+
+    it('should validate agentName is a string', async () => {
+      const ws = await openWs();
+      ws.send(JSON.stringify({
+        type: 'register',
+        machineId: 'test-bad-name',
+        token: SHARED_SECRET,
+        agentName: 12345,
+      }));
+      await new Promise((r) => setTimeout(r, 500));
+
+      const res = await fetch(`${BASE_URL}/status`, { headers: authHeaders });
+      const body = await res.json();
+      const worker = body.find((w) => w.machineId === 'test-bad-name');
+      assert.ok(worker);
+      assert.equal(worker.agentName, null, 'Non-string agentName should be rejected');
+
+      ws.close();
+      await new Promise((r) => setTimeout(r, 300));
+    });
+  });
+
+  // =========================================================================
   // Path Validation (via POST /task with workingDir)
   // =========================================================================
 

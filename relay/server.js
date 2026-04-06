@@ -810,10 +810,25 @@ async function main() {
         registered = true;
         clearTimeout(registerTimeout);
 
+        // Close existing connection if this machineId is already registered
+        const existing = workers.get(machineId);
+        if (existing && existing.ws !== ws && existing.ws.readyState === 1) {
+          audit.log('worker.replaced', { machineId, ip: ws._socket.remoteAddress });
+          console.log(`[relay] Closing stale connection for ${machineId}`);
+          existing.ws.close(4005, 'Replaced by new connection');
+        }
+
         // Look up default workingDir from config
         const machineConfig = (config.machines || []).find(
           (m) => m.machineId === machineId
         );
+
+        // Validate agentCapabilities is a string array
+        let caps = [];
+        if (Array.isArray(msg.agentCapabilities) &&
+            msg.agentCapabilities.every(c => typeof c === 'string')) {
+          caps = msg.agentCapabilities;
+        }
 
         workers.set(machineId, {
           ws,
@@ -821,9 +836,9 @@ async function main() {
           connectedAt: new Date().toISOString(),
           workingDir: machineConfig?.defaultWorkingDir ?? null,
           lastPong: Date.now(),
-          agentName: msg.agentName || null,
-          agentDescription: msg.agentDescription || null,
-          agentCapabilities: msg.agentCapabilities || [],
+          agentName: typeof msg.agentName === 'string' ? msg.agentName : null,
+          agentDescription: typeof msg.agentDescription === 'string' ? msg.agentDescription : null,
+          agentCapabilities: caps,
         });
 
         audit.log('worker.connected', { machineId, ip: ws._socket.remoteAddress });
@@ -834,6 +849,22 @@ async function main() {
       // --- Result ---
       if (msg.type === 'result' && registered) {
         const { taskId, status, output, durationMs } = msg;
+
+        // Verify the result comes from the machine the task was dispatched to
+        const task = registry.getTask(taskId);
+        if (!task) {
+          audit.security('result.invalid_task', { machineId, taskId });
+          console.log(`[relay] Result for unknown task ${taskId} from ${machineId} — ignored`);
+          return;
+        }
+        if (task.machineId !== machineId) {
+          audit.security('result.wrong_machine', {
+            taskId, expected: task.machineId, actual: machineId,
+          });
+          console.log(`[relay] Result for task ${taskId} from wrong machine ${machineId} (expected ${task.machineId}) — ignored`);
+          return;
+        }
+
         registry.updateTask(taskId, {
           status: status ?? 'done',
           output: output ?? null,
