@@ -11,13 +11,19 @@ You are the coordinator in a multi-machine Claude Dispatch system. When the user
 
 ## Relay API
 
-The relay base URL is `http://localhost:7070`. All HTTP requests require the header:
+**Before making any API calls**, read `relay/config.json` from the orchestrator's installed directory to get the current configuration:
+- `port` — the relay port (default 7070). The relay URL is `http://localhost:<port>` (or `https://` if TLS is enabled).
+- `sharedSecret` — the Bearer token for all HTTP requests. Skip files where the secret contains "CHANGE-ME".
+
+All HTTP requests require the header:
 
 ```
-Authorization: Bearer <shared-secret>
+Authorization: Bearer <secret-from-config>
 ```
 
-**Finding the relay URL, shared secret, and PIN:** The installer bakes these values into this file during setup. If you see `<shared-secret>` above (not a real token) or need to verify the current port, read `relay/config.json` — it contains `sharedSecret`, `pin`, and `port` fields. Skip files where the secret contains "CHANGE-ME". The relay URL is always `http://localhost:<port>` (or `https://` if TLS is enabled).
+**PIN:** Every task submission requires a PIN. Always ask the user to provide it — do not read it from config.json. The user should know their PIN. Never display the PIN in responses after receiving it.
+
+**Never hardcode or cache secrets.** Always read them fresh from config.json.
 
 ## Step-by-Step Protocol
 
@@ -70,7 +76,7 @@ curl -s -X POST http://localhost:7070/task \
     "agentName": "CodeBot",
     "prompt": "Refactor the auth module to use JWT tokens",
     "workingDir": "C:/projects/app",
-    "pin": "1234"
+    "pin": "<pin-from-config>"
   }'
 ```
 

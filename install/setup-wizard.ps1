@@ -1584,16 +1584,12 @@ function Run-Installation {
         Write-InstallLog "Deploying orchestrate skill for Claude Code..." "INFO"
         $skillSource = Join-Path (Join-Path $ProjectRoot ".claude") "skills\orchestrate\SKILL.md"
         if (Test-Path $skillSource) {
-            # Read the configured secret and PIN
-            $cfgSecret = if ($script:SetupMode -eq "basic") { $script:txtBasicSecret.Text } else { $script:txtSecretCoord.Text }
-            $cfgPin = if ($script:SetupMode -eq "basic") { $script:txtBasicPin.Text } else { $script:txtPinCode.Text }
+            # Read the configured port (secrets are read from config.json at runtime)
             $cfgPort = if ($script:SetupMode -eq "basic") { $script:txtBasicPort.Text } else { $script:txtPort.Text }
 
-            # Read the template and inject actual values
+            # Read the template — only inject the port, never bake secrets into the skill
             $skillContent = [System.IO.File]::ReadAllText($skillSource)
-            $skillContent = $skillContent -replace '<shared-secret>', $cfgSecret
-            $skillContent = $skillContent -replace '"pin": "1234"', "`"pin`": `"$cfgPin`""
-            $skillContent = $skillContent -replace 'http://localhost:7070', "http://localhost:$cfgPort"
+            $skillContent = $skillContent -replace 'default 7070', "default $cfgPort"
 
             # Deploy to user's global ~/.claude/skills/orchestrate/ so it works in any project
             $globalDir = Join-Path $env:USERPROFILE ".claude\skills\orchestrate"
@@ -1673,8 +1669,6 @@ function Run-Installation {
         $promptTemplate = Join-Path (Join-Path $ProjectRoot "install") "cowork-skill-prompt.txt"
         if (Test-Path $promptTemplate) {
             $promptContent = [System.IO.File]::ReadAllText($promptTemplate)
-            $promptContent = $promptContent -replace '\{\{SECRET\}\}', $cfgSecret
-            $promptContent = $promptContent -replace '\{\{PIN\}\}', $cfgPin
             $promptContent = $promptContent -replace '\{\{PORT\}\}', $cfgPort
             $script:CoworkPrompt = $promptContent
         }

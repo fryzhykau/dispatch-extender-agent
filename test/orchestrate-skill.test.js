@@ -123,10 +123,12 @@ describe('setup wizard deploys orchestrate skill', () => {
       'Setup wizard should deploy skill for coordinator role');
   });
 
-  it('setup wizard should bake secret and PIN into skill', () => {
+  it('setup wizard should NOT bake secrets into skill (read from config.json at runtime)', () => {
     wizardContent = wizardContent || fs.readFileSync(wizardPath, 'utf-8');
-    assert.ok(wizardContent.includes('cfgSecret') && wizardContent.includes('cfgPin'),
-      'Setup wizard should inject secret and PIN into skill');
+    assert.ok(!wizardContent.includes("replace '<shared-secret>'"),
+      'Setup wizard should not inject shared secret into skill');
+    assert.ok(wizardContent.includes('cfgPort'),
+      'Setup wizard should inject port into skill');
   });
 
   it('setup wizard should have a Copy Cowork Prompt button', () => {
@@ -196,11 +198,11 @@ describe('Cowork skill-creator prompt template', () => {
     assert.ok(fs.existsSync(promptPath), 'Cowork prompt template missing');
   });
 
-  it('should contain placeholders for secret, PIN, and port', () => {
+  it('should contain port placeholder and reference config.json for secrets', () => {
     const content = fs.readFileSync(promptPath, 'utf-8');
-    assert.ok(content.includes('{{SECRET}}'), 'Missing {{SECRET}} placeholder');
-    assert.ok(content.includes('{{PIN}}'), 'Missing {{PIN}} placeholder');
     assert.ok(content.includes('{{PORT}}'), 'Missing {{PORT}} placeholder');
+    assert.ok(content.includes('config.json'), 'Should reference config.json for secrets');
+    assert.ok(!content.includes('{{SECRET}}'), 'Should NOT contain {{SECRET}} placeholder (secrets read at runtime)');
   });
 
   it('should reference the orchestrate skill name', () => {
