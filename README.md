@@ -440,6 +440,19 @@ The relay pings all workers every 30 seconds. Workers that don't respond within 
 
 Both the relay and workers prevent Windows from sleeping while active. Uses the Windows `SetThreadExecutionState` API. Disable with `keepAwake.enabled: false` in config.
 
+### Task Retention
+
+Completed tasks (`done`, `error`, `timeout`) are automatically purged after 7 days. The purge runs on relay startup and every 24 hours. Pending and running tasks are never purged regardless of age.
+
+### Browser Automation (Playwright MCP)
+
+The agent setup wizard offers an optional **Playwright MCP** installation. When enabled, the agent gets a real Chromium browser it can use to navigate web pages, click buttons, fill forms, and take screenshots. The wizard:
+
+1. Downloads Chromium via `npx playwright install chromium`
+2. Configures `@playwright/mcp` in the user's `~/.claude.json`
+
+This is useful for agents that need to interact with web applications (e.g., opening Google Meet, submitting forms, taking screenshots of dashboards).
+
 ### Dashboard
 
 A real-time web dashboard at `http://localhost:7070/dashboard` showing:
