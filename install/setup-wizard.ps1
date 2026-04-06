@@ -575,10 +575,10 @@ $yC += 24
 
 # PIN
 $pCoordCfg.Controls.Add((New-StyledLabel -Text "PIN Code:" -X 20 -Y $yC -Width 120 -Height 22))
-$script:txtPinCode = New-StyledTextBox -X 150 -Y ($yC - 2) -Width 100 -Text ""
+$script:txtPinCode = New-StyledTextBox -X 150 -Y ($yC - 2) -Width 100 -Text "$(Get-Random -Minimum 1000 -Maximum 9999)"
 $pCoordCfg.Controls.Add($script:txtPinCode)
 $yC += 22
-$pCoordCfg.Controls.Add((New-StyledLabel -Text "Second factor for task submission. 4-8 digits, leave blank to disable." -X 150 -Y $yC -Width 340 -Height 18 -Font $F_SMALL -Color $C_TEXTDIM))
+$pCoordCfg.Controls.Add((New-StyledLabel -Text "You'll need this PIN when dispatching tasks. 4-8 digits." -X 150 -Y $yC -Width 340 -Height 18 -Font $F_SMALL -Color $C_TEXTDIM))
 $yC += 28
 
 # Checkboxes with descriptions
@@ -1056,10 +1056,10 @@ $yB += 28
 
 # PIN
 $p10.Controls.Add((New-StyledLabel -Text "PIN Code:" -X 20 -Y $yB -Width 120 -Height 22))
-$script:txtBasicPin = New-StyledTextBox -X 150 -Y ($yB - 2) -Width 100 -Text ""
+$script:txtBasicPin = New-StyledTextBox -X 150 -Y ($yB - 2) -Width 100 -Text "$(Get-Random -Minimum 1000 -Maximum 9999)"
 $p10.Controls.Add($script:txtBasicPin)
 $yB += 22
-$p10.Controls.Add((New-StyledLabel -Text "Second factor for task submission. 4-8 digits, leave blank to disable." -X 150 -Y $yB -Width 340 -Height 18 -Font $F_SMALL -Color $C_TEXTDIM))
+$p10.Controls.Add((New-StyledLabel -Text "You'll need this PIN when dispatching tasks. 4-8 digits." -X 150 -Y $yB -Width 340 -Height 18 -Font $F_SMALL -Color $C_TEXTDIM))
 $yB += 32
 
 $p10.Controls.Add((New-StyledLabel -Text "Basic mode uses these defaults:" -X 20 -Y $yB -Width 460 -Height 22 -Font $F_NORMAL -Color $C_TEXTDIM))
