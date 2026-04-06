@@ -256,7 +256,9 @@ The setup wizard deploys the skill to `~/.claude/skills/orchestrate/SKILL.md` wi
 
 ### Claude Cowork / Dispatch
 
-Cowork runs skills inside isolated session containers and does not read from the host's `~/.claude/skills/` directory. The setup wizard packages the skill as a `.skill` file (zip archive) with your credentials baked in.
+Cowork runs skills inside isolated cloud containers and does not read from the host's `~/.claude/skills/` directory. The setup wizard packages the skill as a `.skill` file (zip archive) with your credentials baked in.
+
+> **Important:** Since the relay runs on `localhost`, the orchestrate skill only works from **Code mode** (the Code tab in Claude Desktop) or **Claude Code CLI** — not from Cowork's default sandbox, which runs in the cloud and cannot reach your local network. When using Claude Desktop, switch to the **Code** tab and trust the project directory to use `/orchestrate`.
 
 **To install:**
 

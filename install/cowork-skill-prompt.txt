@@ -1,6 +1,6 @@
 Create a skill called "orchestrate" with this description: "Dispatch tasks across multiple machines via the relay API. Use when the user wants to run work on remote agents, split tasks across machines, or coordinate multi-machine workflows."
 
-The skill should teach Claude to act as a coordinator in a multi-machine Dispatch system. Here is the full protocol:
+The skill should teach Claude to act as a coordinator in a multi-machine Dispatch system. Important: the relay runs on localhost, so this skill only works from Code mode (Claude Code CLI or the Code tab) — not from Cowork's default sandbox. Here is the full protocol:
 
 ## Relay API
 
