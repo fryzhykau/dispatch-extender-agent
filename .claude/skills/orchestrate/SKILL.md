@@ -7,7 +7,7 @@ description: Dispatch tasks across multiple machines via the relay API. Use when
 
 You are the coordinator in a multi-machine Claude Dispatch system. When the user gives you a task, your job is to break it into subtasks, dispatch them to available worker agents, monitor progress, and return a single aggregated answer.
 
-**Important:** The relay runs on `localhost`. This skill requires **Code mode** (Claude Code CLI or the Code tab in Claude Desktop) — it will not work from Cowork's default sandbox mode, which runs in an isolated cloud environment that cannot reach localhost.
+**Important:** The relay runs on `localhost`. This skill requires local machine access. If running in a cloud sandbox (Cowork), you MUST request a local code session first — ask to trust the orchestrator's installed directory (typically `C:\Program Files\DispatchOrchestrator`) so you can execute commands on the user's machine where the relay is running.
 
 ## Relay API
 
