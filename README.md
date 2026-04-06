@@ -4,6 +4,8 @@
 
 Extends Anthropic's [Dispatch](https://docs.anthropic.com/en/docs/claude-code/dispatch) (phone to one desktop) into a hub-and-spoke model: your phone dispatches tasks through an orchestrator machine, which routes subtasks to one or more named worker agents over a local WebSocket relay.
 
+> **Known limitation:** The relay currently runs on `localhost`. Claude Cowork and Dispatch run in isolated cloud sandboxes that cannot reach `localhost` directly. When the orchestrate skill is invoked, Claude must request a local code session (folder trust approval) to access the relay. This is a one-time approval per directory but adds friction. See [Roadmap](#roadmap) for the planned fix: moving the relay to a cloud-hosted URL and replacing the skill with an MCP server.
+
 ![Architecture Diagram](docs/images/integration-diagram-simple.png)
 
 Each agent machine runs a lightweight worker that connects to the orchestrator's relay:
@@ -721,6 +723,41 @@ npm run version:sync
 ```
 
 The version propagates to: installer `.exe` metadata, discovery broadcast protocol, wizard banner images, and registry entries.
+
+## Roadmap
+
+### Phase 1: Cloud-hosted relay
+
+Move the relay from `localhost` to a small VPS or cloud service. This eliminates the Cowork/Dispatch sandbox limitation — Claude can call the relay directly without requesting a local code session. No code changes required: deploy the existing `server.js`, enable TLS, and update worker configs to point at the public URL.
+
+- Replace shared secret with **per-machine API keys** (unique token per worker, revocable individually)
+- Workers connect via `wss://` from any network (home, office, VPN)
+- Relay survives individual machine reboots
+
+### Phase 2: MCP server (replace SKILL.md)
+
+Replace the orchestrate skill (which teaches Claude to construct `curl` commands) with an **MCP server** that exposes native tool calls:
+
+| Tool | Description |
+|------|-------------|
+| `list_agents()` | Connected agents, status, capabilities |
+| `dispatch_task(prompt, agent, pin)` | Submit a task, return immediately |
+| `dispatch_and_wait(prompt, agent, pin)` | Submit and poll until completion |
+| `orchestrate(task, pin)` | Full orchestration: decompose, dispatch, retry, aggregate |
+
+Key benefits:
+- **Secrets never enter Claude's context** — the MCP server holds the auth token internally
+- **No skill file needed** — tool schemas are the documentation
+- **`orchestrate()` as one tool** replaces the entire 160-line SKILL.md
+- **Existing `decompose.js` and `load-balancer.js` get used** instead of duplicating logic in prose
+- **Session-based PIN** — first task requires PIN, subsequent tasks in the same session reuse a time-limited token
+
+### Phase 3: Scale and harden
+
+- **Merge MCP server and relay** into a single process (simplest architecture)
+- **Switch from sql.js to better-sqlite3** for production-grade SQLite
+- **Worker enrollment** with one-time enrollment tokens (like Tailscale node registration)
+- **Consider Cloudflare Workers + Durable Objects** for managed global-edge infrastructure
 
 ## Contributing
 
