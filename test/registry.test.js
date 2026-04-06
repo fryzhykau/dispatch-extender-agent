@@ -116,6 +116,16 @@ async function createTestRegistry(dbPath) {
       return row ? row.cnt : 0;
     },
 
+    purgeTasks(days = 7) {
+      const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+      db.run(
+        `DELETE FROM tasks WHERE status IN ('done', 'error', 'timeout') AND createdAt < ?`,
+        [cutoff]
+      );
+      const result = queryOne('SELECT changes() as cnt');
+      return result ? result.cnt : 0;
+    },
+
     save() {
       if (!dbPath) return;
       const dir = path.dirname(dbPath);
@@ -394,6 +404,94 @@ describe('countTasks', () => {
     const b = registry.countTasks({ machineId: 'host-b' });
     assert.equal(a, 2);
     assert.equal(b, 1);
+  });
+});
+
+describe('purgeTasks', () => {
+  it('should delete completed tasks older than N days', async () => {
+    const registry = await createTestRegistry();
+    // Insert a task with a createdAt 10 days ago
+    const tenDaysAgo = Date.now() - 10 * 24 * 60 * 60 * 1000;
+    registry._db.run(
+      `INSERT INTO tasks (id, machineId, prompt, workingDir, status, output, createdAt, updatedAt, durationMs)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ['old-done', 'm', 'p', '/w', 'done', 'result', tenDaysAgo, tenDaysAgo, 100]
+    );
+    // Insert a recent completed task
+    const task = registry.createTask({ machineId: 'm', prompt: 'p', workingDir: '/w' });
+    registry.updateTask(task.id, { status: 'done' });
+
+    const purged = registry.purgeTasks(7);
+    assert.equal(purged, 1, 'should purge exactly 1 old task');
+    assert.equal(registry.getTask('old-done'), null, 'old task should be gone');
+    assert.ok(registry.getTask(task.id), 'recent task should still exist');
+  });
+
+  it('should delete error and timeout tasks', async () => {
+    const registry = await createTestRegistry();
+    const old = Date.now() - 10 * 24 * 60 * 60 * 1000;
+    registry._db.run(
+      `INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ['old-error', 'm', 'p', '/w', 'error', 'err', old, old, null]
+    );
+    registry._db.run(
+      `INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ['old-timeout', 'm', 'p', '/w', 'timeout', null, old, old, null]
+    );
+
+    const purged = registry.purgeTasks(7);
+    assert.equal(purged, 2);
+  });
+
+  it('should not delete pending or running tasks', async () => {
+    const registry = await createTestRegistry();
+    const old = Date.now() - 10 * 24 * 60 * 60 * 1000;
+    registry._db.run(
+      `INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ['old-pending', 'm', 'p', '/w', 'pending', null, old, old, null]
+    );
+    registry._db.run(
+      `INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ['old-running', 'm', 'p', '/w', 'running', null, old, old, null]
+    );
+
+    const purged = registry.purgeTasks(7);
+    assert.equal(purged, 0, 'should not purge non-terminal tasks');
+    assert.ok(registry.getTask('old-pending'));
+    assert.ok(registry.getTask('old-running'));
+  });
+
+  it('should not delete tasks within retention period', async () => {
+    const registry = await createTestRegistry();
+    const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+    registry._db.run(
+      `INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ['recent-done', 'm', 'p', '/w', 'done', 'ok', threeDaysAgo, threeDaysAgo, 50]
+    );
+
+    const purged = registry.purgeTasks(7);
+    assert.equal(purged, 0, 'should not purge tasks within retention');
+    assert.ok(registry.getTask('recent-done'));
+  });
+
+  it('should return 0 when no tasks to purge', async () => {
+    const registry = await createTestRegistry();
+    const purged = registry.purgeTasks(7);
+    assert.equal(purged, 0);
+  });
+
+  it('should accept custom retention days', async () => {
+    const registry = await createTestRegistry();
+    const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
+    registry._db.run(
+      `INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ['two-day-old', 'm', 'p', '/w', 'done', 'ok', twoDaysAgo, twoDaysAgo, 50]
+    );
+
+    // 3-day retention: should not purge
+    assert.equal(registry.purgeTasks(3), 0);
+    // 1-day retention: should purge
+    assert.equal(registry.purgeTasks(1), 1);
   });
 });
 

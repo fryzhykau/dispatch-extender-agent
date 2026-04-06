@@ -213,6 +213,21 @@ export async function initRegistry() {
     },
 
     /**
+     * Delete completed tasks (done, error, timeout) older than the given number of days.
+     * Returns the number of rows deleted.
+     * @param {number} [days=7] — retention period in days
+     */
+    purgeTasks(days = 7) {
+      const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+      db.run(
+        `DELETE FROM tasks WHERE status IN ('done', 'error', 'timeout') AND createdAt < ?`,
+        [cutoff]
+      );
+      const result = queryOne('SELECT changes() as cnt');
+      return result ? result.cnt : 0;
+    },
+
+    /**
      * Persist the in-memory database to disk.
      * sql.js operates in memory; call this to write changes to the file.
      */

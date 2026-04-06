@@ -702,6 +702,21 @@ async function main() {
   registry = await initRegistry();
   console.log('[relay] Task registry initialized');
 
+  // Purge completed tasks older than 7 days on startup and daily
+  const PURGE_DAYS = 7;
+  const purged = registry.purgeTasks(PURGE_DAYS);
+  if (purged > 0) {
+    console.log(`[relay] Purged ${purged} completed tasks older than ${PURGE_DAYS} days`);
+    registry.save();
+  }
+  setInterval(() => {
+    const n = registry.purgeTasks(PURGE_DAYS);
+    if (n > 0) {
+      console.log(`[relay] Purged ${n} completed tasks older than ${PURGE_DAYS} days`);
+      registry.save();
+    }
+  }, 24 * 60 * 60 * 1000);
+
   // Initialize task queue
   if (queueConfig.enabled) {
     taskQueue = createTaskQueue(registry, workers, dispatchToWorker, {
