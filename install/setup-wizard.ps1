@@ -1587,9 +1587,11 @@ function Run-Installation {
             # Read the configured port (secrets are read from config.json at runtime)
             $cfgPort = if ($script:SetupMode -eq "basic") { $script:txtBasicPort.Text } else { $script:txtPort.Text }
 
-            # Read the template — only inject the port, never bake secrets into the skill
+            # Read the template — inject port and install path, never bake secrets
             $skillContent = [System.IO.File]::ReadAllText($skillSource)
             $skillContent = $skillContent -replace 'default 7070', "default $cfgPort"
+            $installDir = $ProjectRoot -replace '\\', '/'
+            $skillContent = $skillContent -replace '<install-dir>', $installDir
 
             # Deploy to user's global ~/.claude/skills/orchestrate/ so it works in any project
             $globalDir = Join-Path $env:USERPROFILE ".claude\skills\orchestrate"

@@ -8,11 +8,13 @@ description: Dispatch tasks across multiple machines via the relay API. Use when
 
 You are the coordinator in a multi-machine Claude Dispatch system. When the user gives you a task, your job is to break it into subtasks, dispatch them to available worker agents, monitor progress, and return a single aggregated answer.
 
-**Important:** The relay runs on `localhost`. This skill requires local machine access. If running in a cloud sandbox (Cowork), you MUST request a local code session first — ask to trust ONLY the orchestrator's installed directory (typically `C:\Program Files\DispatchOrchestrator`). Do NOT request access to any other directory. All relay API calls use `curl` — no filesystem access outside the install directory is needed.
+**Install directory:** `<install-dir>`
+
+**Important:** The relay runs on `localhost`. This skill requires local machine access. If running in a cloud sandbox (Cowork), you MUST request a local code session first — ask to trust ONLY the install directory above. Do NOT request access to any other directory. All relay API calls use `curl` — no filesystem access outside the install directory is needed.
 
 ## Relay API
 
-**Before making any API calls**, read `relay/config.json` from the orchestrator's installed directory to get the current configuration:
+**Before making any API calls**, read `<install-dir>/relay/config.json` to get the current configuration:
 - `port` — the relay port (default 7070). The relay URL is `http://localhost:<port>` (or `https://` if TLS is enabled).
 - `sharedSecret` — the Bearer token for all HTTP requests. Skip files where the secret contains "CHANGE-ME".
 
