@@ -37,6 +37,7 @@ if (-not (Test-Path (Join-Path $ProjectRoot "package.json"))) {
 # ---------------------------------------------------------------------------
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 # Enable DPI awareness for crisp rendering on high-DPI displays.
@@ -1629,9 +1630,19 @@ function Run-Installation {
             [System.IO.File]::WriteAllText($skillMdPath, $skillContent, $utf8NoBom)
 
             # Build zip to temp first, then copy to install dir (handles Program Files)
+            # Note: CreateFromDirectory uses backslashes on Windows which violates the
+            # ZIP spec (APPNOTE 4.4.17: paths must use forward slashes). Cowork rejects
+            # backslash paths as "invalid characters". Build the zip manually instead.
             $skillZipTemp = Join-Path ([System.IO.Path]::GetTempPath()) "orchestrate.skill"
             if (Test-Path $skillZipTemp) { Remove-Item $skillZipTemp -Force }
-            [System.IO.Compression.ZipFile]::CreateFromDirectory($skillTempDir, $skillZipTemp)
+            $zipStream = [System.IO.File]::Create($skillZipTemp)
+            $archive = New-Object System.IO.Compression.ZipArchive($zipStream, [System.IO.Compression.ZipArchiveMode]::Create)
+            $entry = $archive.CreateEntry("orchestrate/SKILL.md")
+            $writer = New-Object System.IO.StreamWriter($entry.Open())
+            $writer.Write($skillContent)
+            $writer.Dispose()
+            $archive.Dispose()
+            $zipStream.Dispose()
             Remove-Item $skillTempDir -Recurse -Force
 
             $skillOutputDir = Join-Path $ProjectRoot "data"
