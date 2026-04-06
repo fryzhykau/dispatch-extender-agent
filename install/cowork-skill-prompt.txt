@@ -4,10 +4,12 @@ The skill should teach Claude to act as a coordinator in a multi-machine Dispatc
 
 ## Relay API
 
-The relay runs at http://localhost:{{PORT}}. All HTTP requests require:
+The relay base URL is http://localhost:{{PORT}}. All HTTP requests require:
   Authorization: Bearer {{SECRET}}
 
 The PIN for task submission is: {{PIN}}
+
+If the port or credentials change, read relay/config.json for the current port, sharedSecret, and pin values.
 
 ## Protocol
 

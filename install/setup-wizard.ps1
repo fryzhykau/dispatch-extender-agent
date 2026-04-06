@@ -37,6 +37,7 @@ if (-not (Test-Path (Join-Path $ProjectRoot "package.json"))) {
 # ---------------------------------------------------------------------------
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 # Enable DPI awareness for crisp rendering on high-DPI displays.
 # SetProcessDPIAware tells Windows not to bitmap-scale the window.
@@ -939,7 +940,17 @@ $p7.Controls.Add($script:txtWhatsNext)
 $script:cbStartRelay = New-StyledCheckBox -Text "Start the Relay and open the Dashboard" -X 20 -Y 368 -Width 350 -Checked $true
 $p7.Controls.Add($script:cbStartRelay)
 
-$script:btnCoworkPrompt = New-StyledButton -Text "Copy Cowork Prompt" -X 20 -Y 400 -Width 160 -Height 30
+$script:btnOpenSkillFile = New-StyledButton -Text "Open Cowork Skill" -X 20 -Y 400 -Width 160 -Height 30
+$script:btnOpenSkillFile.Add_Click({
+    if ($script:CoworkSkillPath -and (Test-Path $script:CoworkSkillPath)) {
+        Start-Process explorer.exe -ArgumentList "/select,`"$($script:CoworkSkillPath)`""
+    } else {
+        [void][System.Windows.Forms.MessageBox]::Show("Skill file was not generated during installation.", "Not Available", "OK", "Information")
+    }
+})
+$p7.Controls.Add($script:btnOpenSkillFile)
+
+$script:btnCoworkPrompt = New-StyledButton -Text "Copy Cowork Prompt" -X 190 -Y 400 -Width 160 -Height 30
 $script:btnCoworkPrompt.Add_Click({
     if ($script:CoworkPrompt) {
         [System.Windows.Forms.Clipboard]::SetText($script:CoworkPrompt)
@@ -1488,7 +1499,7 @@ function Run-Installation {
     $script:progressBar.Value = 0
     $script:txtInstallLog.Text = ""
     $role = $script:SelectedRole
-    $totalSteps = 5
+    $totalSteps = 7
     $doTls = ($script:SetupMode -eq "advanced") -and $script:cbEnableTLS.Checked -and $script:rbSelfSigned.Checked
     $doService = ($script:SetupMode -eq "advanced") -and $script:cbInstallService.Checked
     if ($doTls) { $totalSteps++ }
@@ -1566,7 +1577,8 @@ function Run-Installation {
     }
     & $advanceProgress
 
-    # --- Step: Deploy orchestrate skill (coordinator only) ---
+    # --- Step: Deploy orchestrate skill for Claude Code (coordinator only) ---
+    $script:CoworkSkillInstalled = $false
     if ($role -eq "coordinator") {
         Write-InstallLog "Deploying orchestrate skill for Claude Code..." "INFO"
         $skillSource = Join-Path (Join-Path $ProjectRoot ".claude") "skills\orchestrate\SKILL.md"
@@ -1598,33 +1610,65 @@ function Run-Installation {
                 Write-InstallLog "Failed to deploy skill to $globalDir`: $_" "FAIL"
                 Write-InstallLog "You can manually copy .claude\skills\orchestrate\SKILL.md to $globalDir" "INFO"
             }
-
-            # Deploy to Cowork skills directory (OneDrive\Documents\Claude\Skills\)
-            $coworkBaseDir = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "Claude\Skills\orchestrate"
-            try {
-                if (-not (Test-Path $coworkBaseDir)) {
-                    New-Item -ItemType Directory -Path $coworkBaseDir -Force | Out-Null
-                }
-                $coworkDest = Join-Path $coworkBaseDir "SKILL.md"
-                [System.IO.File]::WriteAllText($coworkDest, $skillContent, $utf8NoBom)
-                Write-InstallLog "Cowork skill deployed to $coworkBaseDir" "OK"
-            } catch {
-                Write-InstallLog "Failed to deploy Cowork skill: $_" "FAIL"
-            }
-
-            # Also generate a Cowork/Dispatch skill-creator prompt as fallback
-            $promptTemplate = Join-Path (Join-Path $ProjectRoot "install") "cowork-skill-prompt.txt"
-            if (Test-Path $promptTemplate) {
-                $promptContent = [System.IO.File]::ReadAllText($promptTemplate)
-                $promptContent = $promptContent -replace '\{\{SECRET\}\}', $cfgSecret
-                $promptContent = $promptContent -replace '\{\{PIN\}\}', $cfgPin
-                $promptContent = $promptContent -replace '\{\{PORT\}\}', $cfgPort
-                $script:CoworkPrompt = $promptContent
-            }
         } else {
             Write-InstallLog "Orchestrate skill not found in .claude/skills/orchestrate/ - skipped." "SKIP"
         }
     }
+    & $advanceProgress
+
+    # --- Step: Package orchestrate skill for Claude Cowork (coordinator only) ---
+    if ($role -eq "coordinator" -and $skillContent) {
+        Write-InstallLog "Packaging orchestrate skill for Claude Cowork..." "INFO"
+        try {
+            # Build orchestrate.skill (zip archive: orchestrate/SKILL.md)
+            $skillTempDir = Join-Path ([System.IO.Path]::GetTempPath()) "orchestrate-skill-pkg"
+            $skillInnerDir = Join-Path $skillTempDir "orchestrate"
+            if (Test-Path $skillTempDir) { Remove-Item $skillTempDir -Recurse -Force }
+            New-Item -ItemType Directory -Path $skillInnerDir -Force | Out-Null
+            $skillMdPath = Join-Path $skillInnerDir "SKILL.md"
+            [System.IO.File]::WriteAllText($skillMdPath, $skillContent, $utf8NoBom)
+
+            # Build zip to temp first, then copy to install dir (handles Program Files)
+            $skillZipTemp = Join-Path ([System.IO.Path]::GetTempPath()) "orchestrate.skill"
+            if (Test-Path $skillZipTemp) { Remove-Item $skillZipTemp -Force }
+            [System.IO.Compression.ZipFile]::CreateFromDirectory($skillTempDir, $skillZipTemp)
+            Remove-Item $skillTempDir -Recurse -Force
+
+            $skillOutputDir = Join-Path $ProjectRoot "data"
+            $skillZipPath = Join-Path $skillOutputDir "orchestrate.skill"
+            try {
+                if (-not (Test-Path $skillOutputDir)) {
+                    New-Item -ItemType Directory -Path $skillOutputDir -Force | Out-Null
+                }
+                Copy-Item $skillZipTemp $skillZipPath -Force
+            } catch {
+                # Program Files needs elevation
+                Write-InstallLog "Direct write failed, requesting elevation..." "INFO"
+                $copyCmd = "if (-not (Test-Path '$skillOutputDir')) { New-Item -ItemType Directory -Path '$skillOutputDir' -Force | Out-Null }; Copy-Item '$skillZipTemp' '$skillZipPath' -Force"
+                Start-Process powershell -ArgumentList "-NoProfile -Command `"$copyCmd`"" -Verb RunAs -Wait
+            }
+            Remove-Item $skillZipTemp -Force -ErrorAction SilentlyContinue
+
+            $script:CoworkSkillPath = $skillZipPath
+            $script:CoworkSkillInstalled = $true
+            Write-InstallLog "Cowork skill packaged: $skillZipPath" "OK"
+            Write-InstallLog "Open this file in Claude Cowork to install /orchestrate." "INFO"
+        } catch {
+            Write-InstallLog "Failed to package Cowork skill: $_" "FAIL"
+            Write-InstallLog "You can use /skill-creator in Cowork to set up /orchestrate manually." "INFO"
+        }
+
+        # Also generate a Cowork/Dispatch skill-creator prompt as fallback
+        $promptTemplate = Join-Path (Join-Path $ProjectRoot "install") "cowork-skill-prompt.txt"
+        if (Test-Path $promptTemplate) {
+            $promptContent = [System.IO.File]::ReadAllText($promptTemplate)
+            $promptContent = $promptContent -replace '\{\{SECRET\}\}', $cfgSecret
+            $promptContent = $promptContent -replace '\{\{PIN\}\}', $cfgPin
+            $promptContent = $promptContent -replace '\{\{PORT\}\}', $cfgPort
+            $script:CoworkPrompt = $promptContent
+        }
+    }
+    & $advanceProgress
 
     # --- Step: TLS certs ---
     if ($doTls) {
@@ -1900,14 +1944,27 @@ $btnNext.Add_Click({
                 $secretHint = $secret.Substring(0, [Math]::Min(4, $secret.Length)) + "...." + $secret.Substring([Math]::Max(0, $secret.Length - 4))
                 $svcInstalled = ($script:SetupMode -eq "advanced") -and $script:cbInstallService.Checked
                 $script:lblCompleteSummary.Text = "Your machine has been configured as the Orchestrator.`nThe relay server is configured on port $port.`nShared secret has been set in relay/config.json."
-                $coworkSection = `
-                    "`r`n`r`nCOWORK / DISPATCH SETUP`r`n" +
-                    "----------------------------------------------------`r`n`r`n" +
-                    "To use /orchestrate from Claude Cowork or Dispatch:`r`n`r`n" +
-                    "1.  Open Claude Cowork on this machine`r`n" +
-                    "2.  Type: /skill-creator`r`n" +
-                    "3.  Click 'Copy Cowork Prompt' below and paste it`r`n" +
-                    "4.  The skill-creator will set up /orchestrate for you`r`n"
+                if ($script:CoworkSkillInstalled) {
+                    $skillPath = $script:CoworkSkillPath
+                    $coworkSection = `
+                        "`r`n`r`nCOWORK / DISPATCH`r`n" +
+                        "----------------------------------------------------`r`n`r`n" +
+                        "The /orchestrate skill has been packaged for Claude Cowork:`r`n`r`n" +
+                        "    $skillPath`r`n`r`n" +
+                        "To install:`r`n" +
+                        "1.  Open Claude Cowork`r`n" +
+                        "2.  Open the orchestrate.skill file (or drag it into Cowork)`r`n" +
+                        "3.  Click 'Save skill' when the skill card appears`r`n"
+                } else {
+                    $coworkSection = `
+                        "`r`n`r`nCOWORK / DISPATCH SETUP`r`n" +
+                        "----------------------------------------------------`r`n`r`n" +
+                        "To use /orchestrate from Claude Cowork or Dispatch:`r`n`r`n" +
+                        "1.  Open Claude Cowork on this machine`r`n" +
+                        "2.  Type: /skill-creator`r`n" +
+                        "3.  Click 'Copy Cowork Prompt' below and paste it`r`n" +
+                        "4.  The skill-creator will set up /orchestrate for you`r`n"
+                }
                 if ($svcInstalled) {
                     $script:txtWhatsNext.Text = `
                         "NEXT STEPS`r`n" +

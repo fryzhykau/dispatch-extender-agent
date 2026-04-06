@@ -9,13 +9,13 @@ You are the coordinator in a multi-machine Claude Dispatch system. When the user
 
 ## Relay API
 
-The relay runs at `http://localhost:7070`. All HTTP requests require the header:
+The relay base URL is `http://localhost:7070`. All HTTP requests require the header:
 
 ```
 Authorization: Bearer <shared-secret>
 ```
 
-**Finding the shared secret and PIN:** The installer bakes these values into this file during setup. If you see `<shared-secret>` above (not a real token), the skill was not installed via the setup wizard. In that case, read the `sharedSecret` field from `relay/config.json` in the current working directory. Skip files where the secret contains "CHANGE-ME".
+**Finding the relay URL, shared secret, and PIN:** The installer bakes these values into this file during setup. If you see `<shared-secret>` above (not a real token) or need to verify the current port, read `relay/config.json` — it contains `sharedSecret`, `pin`, and `port` fields. Skip files where the secret contains "CHANGE-ME". The relay URL is always `http://localhost:<port>` (or `https://` if TLS is enabled).
 
 ## Step-by-Step Protocol
 

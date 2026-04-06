@@ -109,29 +109,83 @@ describe('orchestrate skill (.claude/skills/orchestrate/SKILL.md)', () => {
 
 describe('setup wizard deploys orchestrate skill', () => {
   const wizardPath = path.join(ROOT, 'install', 'setup-wizard.ps1');
+  let wizardContent;
 
   it('setup wizard should reference orchestrate skill deployment', () => {
-    const wizardContent = fs.readFileSync(wizardPath, 'utf-8');
+    wizardContent = fs.readFileSync(wizardPath, 'utf-8');
     assert.ok(wizardContent.includes('orchestrate'),
       'Setup wizard does not mention orchestrate skill');
   });
 
   it('setup wizard should deploy skill only for coordinator role', () => {
-    const wizardContent = fs.readFileSync(wizardPath, 'utf-8');
+    wizardContent = wizardContent || fs.readFileSync(wizardPath, 'utf-8');
     assert.ok(wizardContent.includes('coordinator') && wizardContent.includes('orchestrate'),
       'Setup wizard should deploy skill for coordinator role');
   });
 
   it('setup wizard should bake secret and PIN into skill', () => {
-    const wizardContent = fs.readFileSync(wizardPath, 'utf-8');
+    wizardContent = wizardContent || fs.readFileSync(wizardPath, 'utf-8');
     assert.ok(wizardContent.includes('cfgSecret') && wizardContent.includes('cfgPin'),
       'Setup wizard should inject secret and PIN into skill');
   });
 
   it('setup wizard should have a Copy Cowork Prompt button', () => {
-    const wizardContent = fs.readFileSync(wizardPath, 'utf-8');
+    wizardContent = wizardContent || fs.readFileSync(wizardPath, 'utf-8');
     assert.ok(wizardContent.includes('Copy Cowork Prompt'),
       'Setup wizard should have Cowork prompt copy button');
+  });
+
+  it('setup wizard should have an Open Cowork Skill button', () => {
+    wizardContent = wizardContent || fs.readFileSync(wizardPath, 'utf-8');
+    assert.ok(wizardContent.includes('Open Cowork Skill'),
+      'Setup wizard should have Open Cowork Skill button');
+  });
+
+  it('setup wizard should have separate Claude Code and Cowork deployment steps', () => {
+    wizardContent = wizardContent || fs.readFileSync(wizardPath, 'utf-8');
+    assert.ok(wizardContent.includes('Deploy orchestrate skill for Claude Code'),
+      'Missing Claude Code skill deployment step');
+    assert.ok(wizardContent.includes('Deploy orchestrate skill for Claude Cowork') ||
+      wizardContent.includes('Package orchestrate skill for Claude Cowork'),
+      'Missing Cowork skill deployment step');
+  });
+
+  it('setup wizard should package Cowork skill as .skill zip archive', () => {
+    wizardContent = wizardContent || fs.readFileSync(wizardPath, 'utf-8');
+    assert.ok(wizardContent.includes('orchestrate.skill'),
+      'Missing .skill file reference');
+    assert.ok(wizardContent.includes('ZipFile') || wizardContent.includes('CreateFromDirectory'),
+      'Missing zip packaging logic');
+  });
+
+  it('setup wizard should track CoworkSkillInstalled state', () => {
+    wizardContent = wizardContent || fs.readFileSync(wizardPath, 'utf-8');
+    assert.ok(wizardContent.includes('CoworkSkillInstalled'),
+      'Missing CoworkSkillInstalled tracking variable');
+  });
+
+  it('setup wizard should track CoworkSkillPath for the Open button', () => {
+    wizardContent = wizardContent || fs.readFileSync(wizardPath, 'utf-8');
+    assert.ok(wizardContent.includes('CoworkSkillPath'),
+      'Missing CoworkSkillPath variable');
+  });
+
+  it('setup wizard should show .skill file path on success in Complete page', () => {
+    wizardContent = wizardContent || fs.readFileSync(wizardPath, 'utf-8');
+    assert.ok(wizardContent.includes('has been packaged for Claude Cowork'),
+      'Missing success message for packaged skill on Complete page');
+  });
+
+  it('setup wizard should show /skill-creator fallback on failure in Complete page', () => {
+    wizardContent = wizardContent || fs.readFileSync(wizardPath, 'utf-8');
+    assert.ok(wizardContent.includes('skill-creator'),
+      'Missing /skill-creator fallback in Complete page');
+  });
+
+  it('setup wizard should load System.IO.Compression for zip packaging', () => {
+    wizardContent = wizardContent || fs.readFileSync(wizardPath, 'utf-8');
+    assert.ok(wizardContent.includes('System.IO.Compression.FileSystem'),
+      'Missing System.IO.Compression assembly load');
   });
 });
 

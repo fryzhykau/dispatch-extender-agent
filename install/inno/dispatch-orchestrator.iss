@@ -446,12 +446,16 @@ begin
       RemoveDir(ExpandConstant('{%USERPROFILE}\.claude\skills'));
     end;
 
-    // Remove Cowork skill (Documents\Claude\Skills\orchestrate\)
+    // Remove Cowork skill directory (legacy path from older installs)
     CoworkDir := ExpandConstant('{userdocs}\Claude\Skills\orchestrate');
     if DirExists(CoworkDir) then
     begin
       DelTree(CoworkDir, True, True, True);
       RemoveDir(ExpandConstant('{userdocs}\Claude\Skills'));
     end;
+
+    // Remove packaged Cowork skill file (data\orchestrate.skill)
+    if FileExists(ExpandConstant('{app}\data\orchestrate.skill')) then
+      DeleteFile(ExpandConstant('{app}\data\orchestrate.skill'));
   end;
 end;

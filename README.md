@@ -256,12 +256,19 @@ The setup wizard deploys the skill to `~/.claude/skills/orchestrate/SKILL.md` wi
 
 ### Claude Cowork / Dispatch
 
-Cowork uses a different skill system. The setup wizard generates a ready-to-paste prompt with your credentials. On the Complete page:
+Cowork runs skills inside isolated session containers and does not read from the host's `~/.claude/skills/` directory. The setup wizard packages the skill as a `.skill` file (zip archive) with your credentials baked in.
 
-1. Click **"Copy Cowork Prompt"**
-2. Open Claude Cowork
-3. Type `/skill-creator`
-4. Paste the prompt — it will create the `/orchestrate` skill for Cowork/Dispatch
+**To install:**
+
+1. After the setup wizard completes, click **"Open Cowork Skill"** to locate the `orchestrate.skill` file
+2. In Claude Cowork, go to **Customize → Skills → + Create skill → Upload a skill**
+3. Select the `orchestrate.skill` file
+
+<p align="center">
+  <img src="docs/images/claude-cowork-skill-installation.png" alt="Claude Cowork skill installation" width="600">
+</p>
+
+**Fallback (if packaging fails):** Click **"Copy Cowork Prompt"** on the Complete page, open Cowork, type `/skill-creator`, and paste the prompt to create the skill interactively.
 
 ## Security
 
@@ -626,7 +633,7 @@ The uninstaller automatically stops and removes Windows services, deletes `node_
 All tests must pass before pushing to any branch:
 
 ```bash
-npm test             # Run all 259 tests (unit, integration, static analysis, security)
+npm test             # Run all 267 tests (unit, integration, static analysis, security)
 npm run pii-check    # Scan for personal information in source code
 npm run precommit    # Runs both pii-check and tests
 ```
@@ -646,7 +653,7 @@ npm run precommit    # Runs both pii-check and tests
 | Queue | `test/queue.test.js` | 13 | Task queuing, drain on idle, max size limits |
 | Discovery | `test/discovery.test.js` | 4 | UDP broadcast, HMAC signing, virtual IP filtering, stop behavior |
 | PS Syntax & Static Analysis | `test/powershell-syntax.test.js` | 76 | Syntax validation (10 scripts), MessageBox leaks, Join-Path args, here-strings, [char] overflow, BOM detection, switch/return bugs, security checks |
-| Orchestrate Skill | `test/orchestrate-skill.test.js` | 22 | SKILL.md format, YAML frontmatter, protocol steps, API endpoints, security guidance, setup wizard deployment, Cowork prompt template |
+| Orchestrate Skill | `test/orchestrate-skill.test.js` | 30 | SKILL.md format, YAML frontmatter, protocol steps, API endpoints, security guidance, setup wizard deployment, .skill zip packaging, Cowork prompt template |
 
 The server integration tests spawn a real relay process on port 7099 with a temporary config, so they validate the full stack end-to-end. The PowerShell static analysis tests catch common PS 5.1 pitfalls without executing the scripts.
 
