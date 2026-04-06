@@ -1,5 +1,6 @@
 ---
 name: orchestrate
+version: 1.0.0
 description: Dispatch tasks across multiple machines via the relay API. Use when the user wants to run work on remote agents, split tasks across machines, or coordinate multi-machine workflows.
 ---
 
