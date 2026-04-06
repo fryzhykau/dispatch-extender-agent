@@ -262,10 +262,21 @@ Cowork runs skills inside isolated session containers and does not read from the
 
 1. After the setup wizard completes, click **"Open Cowork Skill"** to locate the `orchestrate.skill` file
 2. In Claude Cowork, go to **Customize → Skills → + Create skill → Upload a skill**
-3. Select the `orchestrate.skill` file
 
 <p align="center">
-  <img src="docs/images/claude-cowork-skill-installation.png" alt="Claude Cowork skill installation" width="600">
+  <img src="docs/images/claude-cowork-skill-installation.png" alt="Create skill menu in Claude Cowork" width="600">
+</p>
+
+3. Drag or select the `orchestrate.skill` file in the upload dialog
+
+<p align="center">
+  <img src="docs/images/claude-cowork-upload-skill.png" alt="Upload skill dialog in Claude Cowork" width="400">
+</p>
+
+Once installed, the skill appears under **Personal skills** and can be managed (updated, downloaded, or uninstalled) from the skill detail view:
+
+<p align="center">
+  <img src="docs/images/claude-cowork-skill-uninstall.png" alt="Installed orchestrate skill in Claude Cowork" width="700">
 </p>
 
 **Fallback (if packaging fails):** Click **"Copy Cowork Prompt"** on the Complete page, open Cowork, type `/skill-creator`, and paste the prompt to create the skill interactively.

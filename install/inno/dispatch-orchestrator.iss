@@ -355,13 +355,13 @@ begin
   end;
 
   Info := Info + #13#10;
-  Info := Info + '---------------------------------------------' + #13#10;
-  Info := Info + 'ORCHESTRATE SKILL' + #13#10;
-  Info := Info + 'This installer includes a Claude Code custom command' + #13#10;
-  Info := Info + '(/orchestrate) that teaches Claude how to dispatch tasks' + #13#10;
-  Info := Info + 'across your agent network. When invoked via Dispatch,' + #13#10;
-  Info := Info + 'Claude will automatically check agent status, decompose' + #13#10;
-  Info := Info + 'tasks, route subtasks to workers, and aggregate results.' + #13#10;
+
+  // --- Orchestrate Skill ---
+  Info := Info + '[>>]  Orchestrate Skill (manual step after install)' + #13#10;
+  Info := Info + '      The setup wizard will package /orchestrate as a' + #13#10;
+  Info := Info + '      .skill file for Claude Code and Claude Cowork.' + #13#10;
+  Info := Info + '      Claude Code: installed automatically to ~/.claude/skills/' + #13#10;
+  Info := Info + '      Cowork: upload orchestrate.skill via Customize > Skills' + #13#10;
   Info := Info + #13#10;
   Info := Info + 'You may continue even if prerequisites are missing,' + #13#10;
   Info := Info + 'but you will need to install them before running.' + #13#10;
