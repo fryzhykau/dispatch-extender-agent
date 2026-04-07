@@ -1,0 +1,15 @@
+[Unit]
+Description=Dispatch Relay Server
+After=network.target
+
+[Service]
+Type=simple
+User=dispatch
+WorkingDirectory=/opt/dispatch-extender-agent
+ExecStart=/usr/bin/node relay/server.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

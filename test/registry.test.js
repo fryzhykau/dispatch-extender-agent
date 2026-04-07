@@ -1,5 +1,6 @@
 import { describe, it, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -14,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import initSqlJs from 'sql.js';
 import { v4 as uuidv4 } from 'uuid';
 
-const CREATE_TABLE_SQL = `
+const CREATE_TASKS_SQL = `
   CREATE TABLE IF NOT EXISTS tasks (
     id TEXT PRIMARY KEY,
     machineId TEXT,
@@ -28,6 +29,17 @@ const CREATE_TABLE_SQL = `
   )
 `;
 
+const CREATE_MACHINES_SQL = `
+  CREATE TABLE IF NOT EXISTS machines (
+    machineId TEXT PRIMARY KEY,
+    apiKey TEXT UNIQUE NOT NULL,
+    agentName TEXT,
+    enrolledAt INTEGER NOT NULL,
+    lastSeen INTEGER,
+    revoked INTEGER DEFAULT 0
+  )
+`;
+
 /**
  * Build an isolated, in-memory registry that exposes the same API as
  * the production initRegistry() result.  This keeps every test
@@ -36,7 +48,8 @@ const CREATE_TABLE_SQL = `
 async function createTestRegistry(dbPath) {
   const SQL = await initSqlJs();
   const db = new SQL.Database();
-  db.run(CREATE_TABLE_SQL);
+  db.run(CREATE_TASKS_SQL);
+  db.run(CREATE_MACHINES_SQL);
 
   function queryAll(sql, params = []) {
     const stmt = db.prepare(sql);
@@ -114,6 +127,40 @@ async function createTestRegistry(dbPath) {
       if (conditions.length > 0) sql += ' WHERE ' + conditions.join(' AND ');
       const row = queryOne(sql, values);
       return row ? row.cnt : 0;
+    },
+
+    // Machine management
+    enrollMachine({ machineId, agentName }) {
+      const existing = queryOne('SELECT * FROM machines WHERE machineId = ?', [machineId]);
+      if (existing && !existing.revoked) {
+        throw new Error(`Machine '${machineId}' is already enrolled`);
+      }
+      const apiKey = crypto.randomBytes(32).toString('hex');
+      const now = Date.now();
+      if (existing) {
+        db.run(`UPDATE machines SET apiKey = ?, agentName = ?, enrolledAt = ?, lastSeen = NULL, revoked = 0 WHERE machineId = ?`,
+          [apiKey, agentName || null, now, machineId]);
+      } else {
+        db.run(`INSERT INTO machines (machineId, apiKey, agentName, enrolledAt, lastSeen, revoked) VALUES (?, ?, ?, ?, NULL, 0)`,
+          [machineId, apiKey, agentName || null, now]);
+      }
+      return { machineId, apiKey, agentName: agentName || null, enrolledAt: now };
+    },
+    revokeMachine(machineId) {
+      db.run('UPDATE machines SET revoked = 1 WHERE machineId = ?', [machineId]);
+      return queryOne('SELECT * FROM machines WHERE machineId = ?', [machineId]);
+    },
+    getMachine(machineId) {
+      return queryOne('SELECT * FROM machines WHERE machineId = ?', [machineId]);
+    },
+    getMachineByApiKey(apiKey) {
+      return queryOne('SELECT * FROM machines WHERE apiKey = ?', [apiKey]);
+    },
+    listMachines() {
+      return queryAll('SELECT * FROM machines ORDER BY enrolledAt DESC');
+    },
+    updateLastSeen(machineId) {
+      db.run('UPDATE machines SET lastSeen = ? WHERE machineId = ?', [Date.now(), machineId]);
     },
 
     purgeTasks(days = 7) {
@@ -492,6 +539,85 @@ describe('purgeTasks', () => {
     assert.equal(registry.purgeTasks(3), 0);
     // 1-day retention: should purge
     assert.equal(registry.purgeTasks(1), 1);
+  });
+});
+
+describe('enrollMachine', () => {
+  it('should create a machine with a valid apiKey', async () => {
+    const registry = await createTestRegistry();
+    const result = registry.enrollMachine({ machineId: 'test-1', agentName: 'TestBot' });
+    assert.equal(result.machineId, 'test-1');
+    assert.equal(result.agentName, 'TestBot');
+    assert.equal(result.apiKey.length, 64, 'apiKey should be 64-char hex');
+    assert.ok(result.enrolledAt > 0);
+  });
+
+  it('should reject duplicate non-revoked machineId', async () => {
+    const registry = await createTestRegistry();
+    registry.enrollMachine({ machineId: 'dup-1', agentName: 'Bot' });
+    assert.throws(() => registry.enrollMachine({ machineId: 'dup-1' }), /already enrolled/);
+  });
+
+  it('should allow re-enrollment of revoked machine', async () => {
+    const registry = await createTestRegistry();
+    const first = registry.enrollMachine({ machineId: 're-1', agentName: 'Bot' });
+    registry.revokeMachine('re-1');
+    const second = registry.enrollMachine({ machineId: 're-1', agentName: 'BotV2' });
+    assert.notEqual(first.apiKey, second.apiKey, 'should get a new apiKey');
+    assert.equal(second.agentName, 'BotV2');
+    const machine = registry.getMachine('re-1');
+    assert.equal(machine.revoked, 0);
+  });
+});
+
+describe('getMachineByApiKey', () => {
+  it('should return the correct machine', async () => {
+    const registry = await createTestRegistry();
+    const enrolled = registry.enrollMachine({ machineId: 'lookup-1', agentName: 'Bot' });
+    const found = registry.getMachineByApiKey(enrolled.apiKey);
+    assert.ok(found);
+    assert.equal(found.machineId, 'lookup-1');
+  });
+
+  it('should return null for unknown key', async () => {
+    const registry = await createTestRegistry();
+    const result = registry.getMachineByApiKey('nonexistent-key');
+    assert.equal(result, null);
+  });
+});
+
+describe('revokeMachine', () => {
+  it('should set revoked flag', async () => {
+    const registry = await createTestRegistry();
+    registry.enrollMachine({ machineId: 'rev-1' });
+    const result = registry.revokeMachine('rev-1');
+    assert.equal(result.revoked, 1);
+  });
+
+  it('should return null for non-existent machine', async () => {
+    const registry = await createTestRegistry();
+    const result = registry.revokeMachine('nonexistent');
+    assert.equal(result, null);
+  });
+});
+
+describe('listMachines', () => {
+  it('should return all enrolled machines', async () => {
+    const registry = await createTestRegistry();
+    registry.enrollMachine({ machineId: 'list-1', agentName: 'Bot1' });
+    registry.enrollMachine({ machineId: 'list-2', agentName: 'Bot2' });
+    const machines = registry.listMachines();
+    assert.equal(machines.length, 2);
+  });
+});
+
+describe('updateLastSeen', () => {
+  it('should update the lastSeen timestamp', async () => {
+    const registry = await createTestRegistry();
+    registry.enrollMachine({ machineId: 'seen-1' });
+    registry.updateLastSeen('seen-1');
+    const machine = registry.getMachine('seen-1');
+    assert.ok(machine.lastSeen > 0);
   });
 });
 

@@ -24,7 +24,7 @@ if (!existsSync(configPath)) {
 
 const config = JSON.parse(readFileSync(configPath, "utf-8"));
 
-const { machineId, sharedSecret, defaultWorkingDir, allowedDirs, denyDirs, agentName, agentDescription, agentCapabilities } = config;
+const { machineId, sharedSecret, apiKey, defaultWorkingDir, allowedDirs, denyDirs, agentName, agentDescription, agentCapabilities } = config;
 let coordinatorHost = config.coordinatorHost;
 const tlsConfig = config.tls || { enabled: false };
 const discoveryConfig = config.discovery || { enabled: false };
@@ -87,7 +87,7 @@ function connect() {
       JSON.stringify({
         type: "register",
         machineId,
-        token: sharedSecret,
+        token: apiKey || sharedSecret,
         agentName: agentName || null,
         agentDescription: agentDescription || null,
         agentCapabilities: agentCapabilities || [],

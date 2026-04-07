@@ -10,18 +10,19 @@ You are the coordinator in a multi-machine Claude Dispatch system. When the user
 
 **Install directory:** `<install-dir>`
 
-**Important:** The relay runs on `localhost`. This skill requires local machine access. If running in a cloud sandbox (Cowork), you MUST request a local code session with the working directory set to `<install-dir>` — NOT Documents or any other folder. Only trust and access the install directory above. All relay API calls use `curl` — no filesystem access outside the install directory is needed.
+**Important:** If the relay is on `localhost` (no `relayUrl` in config), this skill requires local machine access. If running in a cloud sandbox (Cowork), you MUST request a local code session with the working directory set to `<install-dir>` — NOT Documents or any other folder. Only trust and access the install directory above. If `relayUrl` is set (cloud deployment), no local session is needed — use the URL directly.
 
 ## Relay API
 
 **Before making any API calls**, read `<install-dir>/relay/config.json` to get the current configuration:
-- `port` — the relay port (default 7070). The relay URL is `http://localhost:<port>` (or `https://` if TLS is enabled).
-- `sharedSecret` — the Bearer token for all HTTP requests. Skip files where the secret contains "CHANGE-ME".
+- `relayUrl` — if set, use this as the relay base URL (e.g., `https://relay.example.com`). If empty, use `http://localhost:<port>`.
+- `port` — the relay port (default 7070). Only used when `relayUrl` is not set.
+- `adminSecret` — the Bearer token for all HTTP requests. If absent, fall back to `sharedSecret`. Skip files where the secret contains "CHANGE-ME".
 
 All HTTP requests require the header:
 
 ```
-Authorization: Bearer <secret-from-config>
+Authorization: Bearer <adminSecret-from-config>
 ```
 
 **PIN:** Every task submission requires a PIN. Always ask the user to provide it — do not read it from config.json. The user should know their PIN. Never display the PIN in responses after receiving it.

@@ -21,6 +21,8 @@ const config = JSON.parse(
 
 const PORT = config.port ?? 7070;
 const SHARED_SECRET = config.sharedSecret;
+const ADMIN_SECRET = config.adminSecret || config.sharedSecret;
+const LEGACY_AUTH_ENABLED = config.legacyAuthEnabled !== false;
 const HEARTBEAT_INTERVAL = config.heartbeat?.intervalMs ?? 30000;
 const HEARTBEAT_TIMEOUT = config.heartbeat?.timeoutMs ?? 10000;
 
@@ -146,7 +148,7 @@ function sendJSON(res, statusCode, body) {
 function authenticate(req) {
   const auth = req.headers['authorization'];
   if (!auth || !auth.startsWith('Bearer ')) return false;
-  return auth.slice(7) === SHARED_SECRET;
+  return auth.slice(7) === ADMIN_SECRET;
 }
 
 function sendUnauthorized(req, res) {
@@ -687,6 +689,96 @@ async function handleRequest(req, res) {
     return;
   }
 
+  // -----------------------------------------------------------------------
+  // Admin: machine enrollment and management
+  // -----------------------------------------------------------------------
+
+  // POST /admin/enroll — enroll a new machine, returns its API key
+  if (req.method === 'POST' && pathname === '/admin/enroll') {
+    if (!authenticate(req)) { sendUnauthorized(req, res); return; }
+    const body = await readBody(req);
+    const { machineId: mId, agentName: aName } = body;
+    if (!mId || typeof mId !== 'string') {
+      sendJSON(res, 400, { error: 'machineId is required' });
+      return;
+    }
+    try {
+      const result = registry.enrollMachine({ machineId: mId, agentName: aName });
+      registry.save();
+      audit.log('admin.enroll', { machineId: mId });
+      sendJSON(res, 201, result);
+    } catch (err) {
+      sendJSON(res, 409, { error: err.message });
+    }
+    return;
+  }
+
+  // POST /admin/revoke — revoke a machine's API key
+  if (req.method === 'POST' && pathname === '/admin/revoke') {
+    if (!authenticate(req)) { sendUnauthorized(req, res); return; }
+    const body = await readBody(req);
+    const { machineId: mId } = body;
+    if (!mId) {
+      sendJSON(res, 400, { error: 'machineId is required' });
+      return;
+    }
+    const result = registry.revokeMachine(mId);
+    if (!result) {
+      sendJSON(res, 404, { error: 'Machine not found' });
+      return;
+    }
+    // Disconnect the worker if connected
+    const worker = workers.get(mId);
+    if (worker && worker.ws.readyState === 1) {
+      worker.ws.close(4003, 'API key revoked');
+      workers.delete(mId);
+    }
+    registry.save();
+    audit.log('admin.revoke', { machineId: mId });
+    sendJSON(res, 200, result);
+    return;
+  }
+
+  // POST /admin/reenroll — generate a new API key for a revoked machine
+  if (req.method === 'POST' && pathname === '/admin/reenroll') {
+    if (!authenticate(req)) { sendUnauthorized(req, res); return; }
+    const body = await readBody(req);
+    const { machineId: mId, agentName: aName } = body;
+    if (!mId) {
+      sendJSON(res, 400, { error: 'machineId is required' });
+      return;
+    }
+    const existing = registry.getMachine(mId);
+    if (!existing) {
+      sendJSON(res, 404, { error: 'Machine not found' });
+      return;
+    }
+    try {
+      const result = registry.enrollMachine({ machineId: mId, agentName: aName || existing.agentName });
+      registry.save();
+      audit.log('admin.reenroll', { machineId: mId });
+      sendJSON(res, 200, result);
+    } catch (err) {
+      sendJSON(res, 409, { error: err.message });
+    }
+    return;
+  }
+
+  // GET /admin/machines — list enrolled machines with live status
+  if (req.method === 'GET' && pathname === '/admin/machines') {
+    if (!authenticate(req)) { sendUnauthorized(req, res); return; }
+    const machines = registry.listMachines().map(m => {
+      const worker = workers.get(m.machineId);
+      return {
+        ...m,
+        connected: !!worker,
+        workerStatus: worker?.status || null,
+      };
+    });
+    sendJSON(res, 200, machines);
+    return;
+  }
+
   // Fallback
   sendJSON(res, 404, { error: 'Not found' });
 }
@@ -789,7 +881,26 @@ async function main() {
 
       // --- Register ---
       if (msg.type === 'register') {
-        if (msg.token !== SHARED_SECRET) {
+        // Authenticate: per-machine API key first, then legacy shared secret
+        const machine = registry.getMachineByApiKey(msg.token);
+        if (machine) {
+          if (machine.revoked) {
+            audit.security('auth.failed', { ip: ws._socket.remoteAddress, reason: 'revoked API key' });
+            ws.close(4003, 'API key revoked');
+            clearTimeout(registerTimeout);
+            return;
+          }
+          if (machine.machineId !== msg.machineId) {
+            audit.security('auth.failed', { ip: ws._socket.remoteAddress, reason: 'machineId mismatch' });
+            ws.close(4003, 'machineId does not match API key');
+            clearTimeout(registerTimeout);
+            return;
+          }
+          registry.updateLastSeen(msg.machineId);
+          registry.save();
+        } else if (LEGACY_AUTH_ENABLED && msg.token === SHARED_SECRET) {
+          // Legacy shared secret fallback
+        } else {
           audit.security('auth.failed', { ip: ws._socket.remoteAddress, reason: 'wrong token' });
           ws.close(4003, 'Invalid token');
           clearTimeout(registerTimeout);
@@ -836,7 +947,7 @@ async function main() {
           connectedAt: new Date().toISOString(),
           workingDir: machineConfig?.defaultWorkingDir ?? null,
           lastPong: Date.now(),
-          agentName: typeof msg.agentName === 'string' ? msg.agentName : null,
+          agentName: typeof msg.agentName === 'string' ? msg.agentName : (machine?.agentName || null),
           agentDescription: typeof msg.agentDescription === 'string' ? msg.agentDescription : null,
           agentCapabilities: caps,
         });

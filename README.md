@@ -56,6 +56,25 @@ See which agents are connected, what they're working on, task history, queue dep
 | **NSSM** | For running as Windows services | `winget install NSSM.NSSM` or [nssm.cc](https://nssm.cc/) |
 | **OpenSSL** | For TLS certificates | Ships with [Git for Windows](https://gitforwindows.org/) |
 
+## Deployment Options
+
+| | Localhost | ngrok / Cloudflare Tunnel | Oracle Cloud (Free Tier) |
+|---|---|---|---|
+| **Cost** | Free | Free | Free (always-free VM) |
+| **Cowork / Dispatch** | Requires local code session | Works directly from sandbox | Works directly from sandbox |
+| **Setup** | `npm run relay` | Relay + `ngrok http 7070` | Provision VM, deploy relay, nginx + Let's Encrypt |
+| **Always-on** | Only while machine is on | Only while machine + tunnel run | 24/7 (cloud VM) |
+| **URL stability** | `localhost:7070` (fixed) | Random URL on restart (paid for fixed) | Fixed IP or domain |
+| **Workers from** | Same LAN only | Anywhere | Anywhere |
+| **TLS** | Optional (self-signed) | Provided by ngrok/CF | Let's Encrypt via nginx |
+| **Latency** | ~0ms | ~50-100ms (tunnel hop) | ~20-50ms |
+| **Best for** | Development, single-machine | Quick demos, temporary access | Production, multi-network teams |
+
+**Limitations:**
+- **Localhost:** Cowork/Dispatch can't reach it from cloud sandbox. Manual folder trust required on each use.
+- **ngrok:** Free tier URL changes on every restart. Connection drops if the tunnel process dies.
+- **Oracle Cloud:** Requires one-time VM setup (~30 min). Most robust for ongoing use. See [`deploy/oracle-cloud-setup.md`](deploy/oracle-cloud-setup.md) for the step-by-step guide.
+
 ## Quick Start
 
 ### 1. Install dependencies
@@ -661,7 +680,7 @@ The uninstaller automatically stops and removes Windows services, deletes `node_
 All tests must pass before pushing to any branch:
 
 ```bash
-npm test             # Run all 276 tests (unit, integration, static analysis, security)
+npm test             # Run all 291 tests (unit, integration, static analysis, security)
 npm run pii-check    # Scan for personal information in source code
 npm run precommit    # Runs both pii-check and tests
 ```
@@ -670,8 +689,8 @@ npm run precommit    # Runs both pii-check and tests
 
 | Suite | File | Tests | What it covers |
 |-------|------|-------|----------------|
-| Registry | `test/registry.test.js` | 27 | SQLite CRUD, filtering, pagination, persistence, task purging |
-| Server | `test/server.test.js` | 22 | HTTP API auth, validation, WebSocket auth/security, rate limiting, path traversal, duplicate registration, metadata validation |
+| Registry | `test/registry.test.js` | 36 | SQLite CRUD, filtering, pagination, persistence, task purging, machine enrollment/revocation |
+| Server | `test/server.test.js` | 28 | HTTP API auth, validation, WebSocket auth/security, rate limiting, path traversal, admin enrollment endpoints, per-machine apiKey auth |
 | Worker | `test/worker.test.js` | 13 | Path allowlist/denylist, normalization, traversal attacks |
 | Load Balancer | `test/load-balancer.test.js` | 14 | All 4 strategies, edge cases |
 | Config | `test/config.test.js` | 26 | Config loading, defaults, validation, merging |

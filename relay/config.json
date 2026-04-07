@@ -1,6 +1,9 @@
 {
   "port": 7099,
+  "adminSecret": "CHANGE-ME-generate-an-admin-secret",
   "sharedSecret": "CHANGE-ME-generate-a-real-secret",
+  "legacyAuthEnabled": true,
+  "relayUrl": "",
   "machines": [
     {
       "machineId": "machine-2",

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { v4 as uuidv4 } from 'uuid';
 import initSqlJs from 'sql.js';
@@ -11,7 +12,7 @@ const __dirname = path.dirname(__filename);
 const dataDir = getDataDir(path.resolve(__dirname, '..'));
 const DB_PATH = path.join(dataDir, 'tasks.db');
 
-const CREATE_TABLE_SQL = `
+const CREATE_TASKS_SQL = `
   CREATE TABLE IF NOT EXISTS tasks (
     id TEXT PRIMARY KEY,
     machineId TEXT,
@@ -22,6 +23,17 @@ const CREATE_TABLE_SQL = `
     createdAt INTEGER,
     updatedAt INTEGER,
     durationMs INTEGER
+  )
+`;
+
+const CREATE_MACHINES_SQL = `
+  CREATE TABLE IF NOT EXISTS machines (
+    machineId TEXT PRIMARY KEY,
+    apiKey TEXT UNIQUE NOT NULL,
+    agentName TEXT,
+    enrolledAt INTEGER NOT NULL,
+    lastSeen INTEGER,
+    revoked INTEGER DEFAULT 0
   )
 `;
 
@@ -44,8 +56,9 @@ export async function initRegistry() {
     db = new SQL.Database();
   }
 
-  // Ensure the tasks table exists
-  db.run(CREATE_TABLE_SQL);
+  // Ensure tables exist
+  db.run(CREATE_TASKS_SQL);
+  db.run(CREATE_MACHINES_SQL);
 
   // Helper: convert a result row (array of columns) into a plain object
   function rowToObject(columns, values) {
@@ -211,6 +224,72 @@ export async function initRegistry() {
       const row = queryOne(sql, values);
       return row ? row.cnt : 0;
     },
+
+    // ----- Machine management -----
+
+    /**
+     * Enroll a new machine and generate a unique API key.
+     * Throws if a non-revoked machine with the same machineId already exists.
+     */
+    enrollMachine({ machineId, agentName }) {
+      const existing = queryOne('SELECT * FROM machines WHERE machineId = ?', [machineId]);
+      if (existing && !existing.revoked) {
+        throw new Error(`Machine '${machineId}' is already enrolled`);
+      }
+      const apiKey = crypto.randomBytes(32).toString('hex');
+      const now = Date.now();
+      if (existing) {
+        // Re-enroll a previously revoked machine
+        db.run(
+          `UPDATE machines SET apiKey = ?, agentName = ?, enrolledAt = ?, lastSeen = NULL, revoked = 0 WHERE machineId = ?`,
+          [apiKey, agentName || null, now, machineId]
+        );
+      } else {
+        db.run(
+          `INSERT INTO machines (machineId, apiKey, agentName, enrolledAt, lastSeen, revoked) VALUES (?, ?, ?, ?, NULL, 0)`,
+          [machineId, apiKey, agentName || null, now]
+        );
+      }
+      return { machineId, apiKey, agentName: agentName || null, enrolledAt: now };
+    },
+
+    /**
+     * Revoke a machine's API key. Returns the updated row or null.
+     */
+    revokeMachine(machineId) {
+      db.run('UPDATE machines SET revoked = 1 WHERE machineId = ?', [machineId]);
+      return queryOne('SELECT * FROM machines WHERE machineId = ?', [machineId]);
+    },
+
+    /**
+     * Get a machine by machineId.
+     */
+    getMachine(machineId) {
+      return queryOne('SELECT * FROM machines WHERE machineId = ?', [machineId]);
+    },
+
+    /**
+     * Look up a machine by its API key. Returns the row or null.
+     */
+    getMachineByApiKey(apiKey) {
+      return queryOne('SELECT * FROM machines WHERE apiKey = ?', [apiKey]);
+    },
+
+    /**
+     * List all enrolled machines.
+     */
+    listMachines() {
+      return queryAll('SELECT * FROM machines ORDER BY enrolledAt DESC');
+    },
+
+    /**
+     * Update the lastSeen timestamp for a machine.
+     */
+    updateLastSeen(machineId) {
+      db.run('UPDATE machines SET lastSeen = ? WHERE machineId = ?', [Date.now(), machineId]);
+    },
+
+    // ----- Task cleanup -----
 
     /**
      * Delete completed tasks (done, error, timeout) older than the given number of days.

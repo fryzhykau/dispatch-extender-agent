@@ -27,7 +27,8 @@ const WS_URL = `ws://127.0.0.1:${TEST_PORT}`;
 // Read the real config to get the shared secret (and base structure)
 const realConfigPath = path.resolve(__dirname, '..', 'relay', 'config.json');
 const realConfig = JSON.parse(fs.readFileSync(realConfigPath, 'utf-8'));
-const SHARED_SECRET = realConfig.sharedSecret;
+const ADMIN_SECRET = realConfig.adminSecret || realConfig.sharedSecret;
+const WORKER_SECRET = realConfig.sharedSecret;  // legacy worker auth token
 
 // Build a test-specific config with a different port, low rate limits,
 // discovery/keepAwake disabled, and PIN enabled for testing.
@@ -56,7 +57,7 @@ const testConfig = {
 
 /** Standard auth header for authenticated requests. */
 const authHeaders = {
-  Authorization: `Bearer ${SHARED_SECRET}`,
+  Authorization: `Bearer ${ADMIN_SECRET}`,
   'Content-Type': 'application/json',
 };
 
@@ -241,7 +242,7 @@ describe('Relay server integration tests', () => {
 
     it('GET /status with correct Bearer token should return 200', async () => {
       const res = await fetch(`${BASE_URL}/status`, {
-        headers: { Authorization: `Bearer ${SHARED_SECRET}` },
+        headers: { Authorization: `Bearer ${ADMIN_SECRET}` },
       });
       assert.equal(res.status, 200);
     });
@@ -419,7 +420,7 @@ describe('Relay server integration tests', () => {
       ws.send(JSON.stringify({
         type: 'register',
         machineId: 'test-ws-good',
-        token: SHARED_SECRET,
+        token: WORKER_SECRET,
         agentName: 'TestAgent',
       }));
 
@@ -452,7 +453,7 @@ describe('Relay server integration tests', () => {
       ws1.send(JSON.stringify({
         type: 'register',
         machineId: 'test-dup-machine',
-        token: SHARED_SECRET,
+        token: WORKER_SECRET,
       }));
       await new Promise((r) => setTimeout(r, 500));
       assert.equal(ws1.readyState, WebSocket.OPEN);
@@ -463,7 +464,7 @@ describe('Relay server integration tests', () => {
       ws2.send(JSON.stringify({
         type: 'register',
         machineId: 'test-dup-machine',
-        token: SHARED_SECRET,
+        token: WORKER_SECRET,
       }));
 
       const { code } = await close1;
@@ -479,7 +480,7 @@ describe('Relay server integration tests', () => {
       ws.send(JSON.stringify({
         type: 'register',
         machineId: 'test-bad-caps',
-        token: SHARED_SECRET,
+        token: WORKER_SECRET,
         agentCapabilities: { __proto__: { polluted: true } },
       }));
       await new Promise((r) => setTimeout(r, 500));
@@ -500,7 +501,7 @@ describe('Relay server integration tests', () => {
       ws.send(JSON.stringify({
         type: 'register',
         machineId: 'test-bad-name',
-        token: SHARED_SECRET,
+        token: WORKER_SECRET,
         agentName: 12345,
       }));
       await new Promise((r) => setTimeout(r, 500));
@@ -554,6 +555,135 @@ describe('Relay server integration tests', () => {
       const body = await res.json();
       assert.ok(body.error.includes('null') || body.error.includes('Invalid'),
         `Expected null byte error, got: ${body.error}`);
+    });
+  });
+
+  // =========================================================================
+  // Admin Endpoints (machine enrollment)
+  // =========================================================================
+
+  describe('Admin Endpoints', () => {
+    // Clean up any test machines left from previous runs
+    before(async () => {
+      const res = await fetch(`${BASE_URL}/admin/machines`, { headers: authHeaders });
+      if (res.ok) {
+        const machines = await res.json();
+        for (const m of machines) {
+          if (m.machineId.startsWith('test-')) {
+            await fetch(`${BASE_URL}/admin/revoke`, {
+              method: 'POST', headers: authHeaders,
+              body: JSON.stringify({ machineId: m.machineId }),
+            });
+          }
+        }
+      }
+    });
+
+    it('POST /admin/enroll should create a machine and return apiKey', async () => {
+      const res = await fetch(`${BASE_URL}/admin/enroll`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ machineId: 'test-enroll-1', agentName: 'EnrollBot' }),
+      });
+      assert.equal(res.status, 201);
+      const body = await res.json();
+      assert.equal(body.machineId, 'test-enroll-1');
+      assert.equal(body.agentName, 'EnrollBot');
+      assert.equal(body.apiKey.length, 64, 'apiKey should be 64-char hex');
+    });
+
+    it('POST /admin/enroll should return 409 for duplicate machineId', async () => {
+      await fetch(`${BASE_URL}/admin/enroll`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ machineId: 'test-dup-enroll' }),
+      });
+      const res = await fetch(`${BASE_URL}/admin/enroll`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ machineId: 'test-dup-enroll' }),
+      });
+      assert.equal(res.status, 409);
+    });
+
+    it('GET /admin/machines should list enrolled machines', async () => {
+      const res = await fetch(`${BASE_URL}/admin/machines`, { headers: authHeaders });
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.ok(Array.isArray(body));
+      const enrolled = body.find(m => m.machineId === 'test-enroll-1');
+      assert.ok(enrolled, 'Previously enrolled machine should appear');
+    });
+
+    it('POST /admin/revoke should revoke a machine', async () => {
+      const enrollRes = await fetch(`${BASE_URL}/admin/enroll`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ machineId: 'test-revoke-1' }),
+      });
+      assert.equal(enrollRes.status, 201);
+
+      const res = await fetch(`${BASE_URL}/admin/revoke`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ machineId: 'test-revoke-1' }),
+      });
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.revoked, 1);
+    });
+
+    it('WebSocket should accept per-machine apiKey', async () => {
+      const enrollRes = await fetch(`${BASE_URL}/admin/enroll`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ machineId: 'test-apikey-ws', agentName: 'ApiKeyBot' }),
+      });
+      const { apiKey } = await enrollRes.json();
+
+      const ws = await openWs();
+      ws.send(JSON.stringify({
+        type: 'register',
+        machineId: 'test-apikey-ws',
+        token: apiKey,
+      }));
+      await new Promise((r) => setTimeout(r, 500));
+      assert.equal(ws.readyState, WebSocket.OPEN, 'Should remain connected with valid apiKey');
+
+      const statusRes = await fetch(`${BASE_URL}/status`, { headers: authHeaders });
+      const agents = await statusRes.json();
+      const agent = agents.find(a => a.machineId === 'test-apikey-ws');
+      assert.ok(agent, 'Agent should appear in status');
+      assert.equal(agent.agentName, 'ApiKeyBot');
+
+      ws.close();
+      await new Promise((r) => setTimeout(r, 300));
+    });
+
+    it('WebSocket should reject revoked apiKey', async () => {
+      const enrollRes = await fetch(`${BASE_URL}/admin/enroll`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ machineId: 'test-revoked-ws' }),
+      });
+      const { apiKey } = await enrollRes.json();
+
+      await fetch(`${BASE_URL}/admin/revoke`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ machineId: 'test-revoked-ws' }),
+      });
+
+      const ws = await openWs();
+      const closePromise = waitForClose(ws);
+      ws.send(JSON.stringify({
+        type: 'register',
+        machineId: 'test-revoked-ws',
+        token: apiKey,
+      }));
+
+      const { code } = await closePromise;
+      assert.equal(code, 4003, 'Should close with 4003 for revoked key');
     });
   });
 

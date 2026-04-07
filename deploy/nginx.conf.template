@@ -1,0 +1,29 @@
+# Dispatch Relay — nginx reverse proxy with Let's Encrypt TLS
+# Replace RELAY_DOMAIN with your actual domain (e.g., relay.example.com)
+
+server {
+    listen 80;
+    server_name RELAY_DOMAIN;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name RELAY_DOMAIN;
+
+    ssl_certificate /etc/letsencrypt/live/RELAY_DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/RELAY_DOMAIN/privkey.pem;
+
+    # WebSocket + HTTP proxy to the relay
+    location / {
+        proxy_pass http://127.0.0.1:7070;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 86400s;  # keep WebSocket connections alive
+    }
+}

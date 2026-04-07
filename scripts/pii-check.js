@@ -204,6 +204,7 @@ function checkSecrets(line) {
     const val = m[1];
     if (SAFE_SECRET_PLACEHOLDERS.has(val.toLowerCase())) continue;
     if (val === "CHANGE-ME-generate-a-real-secret") continue;
+    if (val === "CHANGE-ME-generate-an-admin-secret") continue;
     // Skip things that are obviously hashes in package-lock, or common base64 test data
     // Only flag if it has mixed case or digits (looks key-like, not a word)
     const hasDigit = /\d/.test(val);

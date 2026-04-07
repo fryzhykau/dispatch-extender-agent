@@ -4,6 +4,7 @@
   "agentDescription": "Handles coding tasks, refactoring, and code review",
   "agentCapabilities": ["code", "refactor", "review", "debug"],
   "coordinatorHost": "ws://localhost:7070",
+  "apiKey": "",
   "sharedSecret": "CHANGE-ME-generate-a-real-secret",
   "defaultWorkingDir": "C:/workspace",
   "allowedDirs": [
