@@ -114,6 +114,7 @@ $script:Config = @{
     machineId          = "$($env:COMPUTERNAME.ToLower())-$(Get-Random -Minimum 1000 -Maximum 9999)"
     connectionMode     = "auto"     # "auto" or "manual"
     coordinatorHost    = "ws://192.168.1.100:7070"
+    apiKey             = ""
     sharedSecret       = ""
     defaultWorkingDir  = "C:\workspace"
     allowedDirs        = @("C:\workspace")
@@ -463,7 +464,7 @@ $script:radioManual.Add_CheckedChanged({
     }
 })
 
-New-StyledLabel -Parent $p2 -Text "Shared Secret (required)" -X 20 -Y 224 -Width 300 -Height 20 -Font $FontLabel | Out-Null
+New-StyledLabel -Parent $p2 -Text "API Key / Shared Secret (required)" -X 20 -Y 224 -Width 300 -Height 20 -Font $FontLabel | Out-Null
 $script:txtSecret = New-StyledTextBox -Parent $p2 -Text "" -X 20 -Y 248 -Width 340
 New-StyledLabel -Parent $p2 -Text "Get this from whoever set up the orchestrator" -X 20 -Y 276 -Width 400 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
@@ -768,7 +769,7 @@ New-StyledLabel -Parent $p10 -Text "Agent Name (required)" -X 20 -Y 58 -Width 30
 $script:txtBasicAgentName = New-StyledTextBox -Parent $p10 -Text "agent-1" -X 20 -Y 80 -Width 280
 New-StyledLabel -Parent $p10 -Text "e.g., agent-1, CodeBot, ResearchBot" -X 310 -Y 82 -Width 150 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
-New-StyledLabel -Parent $p10 -Text "Shared Secret (required)" -X 20 -Y 118 -Width 300 -Height 20 -Font $FontLabel | Out-Null
+New-StyledLabel -Parent $p10 -Text "API Key / Shared Secret (required)" -X 20 -Y 118 -Width 300 -Height 20 -Font $FontLabel | Out-Null
 $script:txtBasicSecret = New-StyledTextBox -Parent $p10 -Text "" -X 20 -Y 140 -Width 340
 New-StyledLabel -Parent $p10 -Text "Get this from whoever set up the orchestrator" -X 20 -Y 168 -Width 400 -Height 18 -Font $FontSmall -ForeColor $ColorDimGray | Out-Null
 
@@ -923,6 +924,7 @@ function Collect-Config {
         # machineId stays as auto-generated default
         $script:Config.connectionMode = if ($script:radioBasicAuto.Checked) { "auto" } else { "manual" }
         $script:Config.coordinatorHost = $script:txtBasicCoordAddr.Text.Trim()
+        $script:Config.apiKey = $script:txtBasicSecret.Text.Trim()
         $script:Config.sharedSecret = $script:txtBasicSecret.Text.Trim()
         $script:Config.defaultWorkingDir = "C:\workspace"
         $script:Config.allowedDirs = @("C:\workspace")
@@ -952,6 +954,7 @@ function Collect-Config {
         $script:Config.machineId = $script:txtMachineId.Text.Trim()
         $script:Config.connectionMode = if ($script:radioAuto.Checked) { "auto" } else { "manual" }
         $script:Config.coordinatorHost = $script:txtCoordAddr.Text.Trim()
+        $script:Config.apiKey = $script:txtSecret.Text.Trim()
         $script:Config.sharedSecret = $script:txtSecret.Text.Trim()
         $script:Config.defaultWorkingDir = $script:txtWorkDir.Text.Trim()
         $script:Config.allowedDirs = @(($script:txtAllowed.Text -split "`r?`n") | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
@@ -1004,6 +1007,7 @@ function Build-ConfigJson {
         agentDescription   = $c.agentDescription
         agentCapabilities  = $c.agentCapabilities
         coordinatorHost    = $coordHost
+        apiKey             = $c.apiKey
         sharedSecret       = $c.sharedSecret
         defaultWorkingDir  = $c.defaultWorkingDir
         allowedDirs        = $c.allowedDirs

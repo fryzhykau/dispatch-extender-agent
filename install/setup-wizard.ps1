@@ -1297,9 +1297,13 @@ function Build-ConfigJson {
         $pinEnabled = $script:txtBasicPin.Text.Length -gt 0
         $pinCode = if ($pinEnabled) { $script:txtBasicPin.Text } else { "" }
 
+        $adminSecret = New-SharedSecret
         $config = [ordered]@{
             port = $port
+            adminSecret = $adminSecret
             sharedSecret = $secret
+            legacyAuthEnabled = $true
+            relayUrl = ""
             machines = @(
                 [ordered]@{
                     machineId = "machine-2"
@@ -1364,9 +1368,13 @@ function Build-ConfigJson {
             $caFile = $script:txtCaFile.Text
         }
 
+        $adminSecret = New-SharedSecret
         $config = [ordered]@{
             port = $port
+            adminSecret = $adminSecret
             sharedSecret = $secret
+            legacyAuthEnabled = $true
+            relayUrl = ""
             machines = @(
                 [ordered]@{
                     machineId = "machine-2"
@@ -1441,6 +1449,7 @@ function Build-ConfigJson {
             agentDescription = $script:txtAgentDesc.Text
             agentCapabilities = $caps
             coordinatorHost = $coordHost
+            apiKey = ""
             sharedSecret = $script:txtSecretWorker.Text
             defaultWorkingDir = $script:txtWorkDir.Text
             allowedDirs = $allowedDirs
